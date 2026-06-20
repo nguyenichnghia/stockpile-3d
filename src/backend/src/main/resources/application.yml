@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: stockpile-backend
+
+  datasource:
+    # Secrets come from the environment — never hardcode them here.
+    # Example: jdbc:postgresql://localhost:5432/stockpile_3d
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/stockpile_3d}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate only validates against it.
+      # No entities yet, so there is nothing to validate at empty state.
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    # Migrations live here; empty until the first entity ships.
+    locations: classpath:db/migration
+
+# springdoc / Swagger UI left at defaults:
+#   API docs : /v3/api-docs
+#   Swagger  : /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
