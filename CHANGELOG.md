@@ -1,0 +1,16 @@
+# Changelog
+
+Tất cả thay đổi đáng kể của dự án được ghi tại đây.
+
+Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.0.0/);
+version theo [SemVer](https://semver.org/lang/vi/).
+
+## [Unreleased]
+
+### Added
+- Bộ tài liệu nền (`docs/00`–`03`), `.gitignore`, `CHANGELOG`.
+- Công cụ quy trình: slash command `/ship`, kế hoạch commit theo giai đoạn (`docs/commit-plan.md`).
+- ADR-0002: chốt backend stack Java + Spring Boot.
+- Khung backend Spring Boot (`src/backend`): Java 25, Maven, cấu trúc package theo feature (inventory/relocation/putaway/picking/realtime) phân tầng controller→service→repository; cấu hình DB đọc từ biến môi trường; Flyway sẵn sàng; springdoc-openapi.
+- Health endpoint `GET /api/health`.
+- Khung frontend Next.js + TypeScript (`src/frontend`).
