@@ -17,3 +17,6 @@ version theo [SemVer](https://semver.org/lang/vi/).
 - Data model lõi (Flyway `V1`): 5 bảng `location`, `sku`, `lot`, `placement`, `movement` (ledger append-only), khóa chính BIGINT identity, enum dạng VARCHAR + CHECK, index theo lane.
 - JPA entities + Spring Data repositories cho 5 thực thể (`inventory/domain`, `inventory/repository`).
 - Test migration bằng Testcontainers (PostgreSQL) — verify Flyway áp schema + entity mapping hợp lệ.
+- Projection ledger→placement: `MovementService` (ghi bút toán append-only + cập nhật placement) và `PlacementProjectionService` (`apply` + `rebuildAll` replay từ ledger). Pose placement = tọa độ góc bin (v1).
+- ADR-0003: movement ledger append-only + placement là projection.
+- Test projection (Testcontainers) gồm ca khẳng định incremental == ledger replay.
