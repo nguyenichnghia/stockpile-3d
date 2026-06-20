@@ -1,0 +1,18 @@
+# Node / frontend (Next.js)
+node_modules/
+dist/
+
+# Java / backend (Spring Boot)
+target/
+build/
+.gradle/
+*.class
+
+# Env & misc
+.env
+.env.local
+*.log
+.DS_Store
+
+# Editor (personal preferences)
+.vscode/
