@@ -12,6 +12,7 @@ build/
 .env
 .env.local
 *.log
+*.bak
 .DS_Store
 
 # Editor (personal preferences)
