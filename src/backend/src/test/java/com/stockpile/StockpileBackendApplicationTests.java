@@ -1,15 +1,24 @@
 package com.stockpile;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
+/**
+ * Boots the full application context against a real PostgreSQL container.
+ * Verifies that Flyway applies the migrations and that the JPA entities map
+ * cleanly onto the resulting schema (ddl-auto=validate). Requires Docker.
+ */
 @SpringBootTest
-@Disabled("""
-		Full context load needs a live PostgreSQL (datasource + Flyway). \
-		Re-enable once a test database is wired (e.g. Testcontainers) \
-		alongside the first entities/migrations.""")
+@Testcontainers
 class StockpileBackendApplicationTests {
+
+	@Container
+	@ServiceConnection
+	static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
 	@Test
 	void contextLoads() {
