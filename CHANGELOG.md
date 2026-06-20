@@ -14,3 +14,6 @@ version theo [SemVer](https://semver.org/lang/vi/).
 - Khung backend Spring Boot (`src/backend`): Java 25, Maven, cấu trúc package theo feature (inventory/relocation/putaway/picking/realtime) phân tầng controller→service→repository; cấu hình DB đọc từ biến môi trường; Flyway sẵn sàng; springdoc-openapi.
 - Health endpoint `GET /api/health`.
 - Khung frontend Next.js + TypeScript (`src/frontend`).
+- Data model lõi (Flyway `V1`): 5 bảng `location`, `sku`, `lot`, `placement`, `movement` (ledger append-only), khóa chính BIGINT identity, enum dạng VARCHAR + CHECK, index theo lane.
+- JPA entities + Spring Data repositories cho 5 thực thể (`inventory/domain`, `inventory/repository`).
+- Test migration bằng Testcontainers (PostgreSQL) — verify Flyway áp schema + entity mapping hợp lệ.
