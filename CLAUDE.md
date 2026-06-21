@@ -81,3 +81,6 @@ architecture, or anything hard to reverse. In those cases, do not guess.
   generated artifacts (node_modules/, target/, build/, .gradle/).
 - Commit liberally on feature/* branches; main gets one squashed commit per
   feature at merge.
+- Commits are authored solely as me — no Co-Authored-By or AI-generated
+  attribution trailer. (Enforced by the `attribution` setting; this is a
+  reminder.)
