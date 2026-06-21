@@ -20,3 +20,5 @@ version theo [SemVer](https://semver.org/lang/vi/).
 - Projection ledger→placement: `MovementService` (ghi bút toán append-only + cập nhật placement) và `PlacementProjectionService` (`apply` + `rebuildAll` replay từ ledger). Pose placement = tọa độ góc bin (v1).
 - ADR-0003: movement ledger append-only + placement là projection.
 - Test projection (Testcontainers) gồm ca khẳng định incremental == ledger replay.
+- REST API tồn kho: CRUD cho `sku`, `location`, `lot`; `GET /api/placements` (read-only projection); `POST /api/movements` (ghi ledger append-only). DTO tách entity, Bean Validation, xử lý lỗi 404/400 tập trung (`ApiExceptionHandler`).
+- Integration test API bằng MockMvc + Testcontainers (luồng Putaway → placement, 404, validation, delete).
