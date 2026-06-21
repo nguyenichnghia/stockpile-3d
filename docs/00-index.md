@@ -12,6 +12,7 @@
 | 02 | [Git Workflow](./02-git-workflow.md) | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
 | 03 | [Quy trình tài liệu hóa](./03-documentation.md) | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
 | — | [Sơ đồ thiết kế](./diagrams.md) | Class (domain/service), ERD, component, use case, activity, sequence (Mermaid) + mô hình Astah `diagrams/*.asta` | Khi cần nhìn trực quan data model & kiến trúc |
+| — | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Khi gặp thuật ngữ chưa rõ |
 
 > **Sẽ viết khi có code** (theo mẫu trong 03): `docs/algorithm-spec.md` (đặc tả CRP/SLAP đầy đủ với pseudocode + test case) và các ADR cụ thể trong `docs/adr/`.
 
