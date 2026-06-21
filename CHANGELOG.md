@@ -22,3 +22,5 @@ version theo [SemVer](https://semver.org/lang/vi/).
 - Test projection (Testcontainers) gồm ca khẳng định incremental == ledger replay.
 - REST API tồn kho: CRUD cho `sku`, `location`, `lot`; `GET /api/placements` (read-only projection); `POST /api/movements` (ghi ledger append-only). DTO tách entity, Bean Validation, xử lý lỗi 404/400 tập trung (`ApiExceptionHandler`).
 - Integration test API bằng MockMvc + Testcontainers (luồng Putaway → placement, 404, validation, delete).
+- 3D viewer (frontend): React Three Fiber + Three.js render kho bằng `InstancedMesh` (khung kệ từ `location`, lô từ `placement`), OrbitControls, đọc dữ liệu từ REST API. Chỉ hiển thị, không ra quyết định.
+- CORS cho phép frontend dev (`localhost:3000`) gọi API (cấu hình qua `app.cors.allowed-origins`).
