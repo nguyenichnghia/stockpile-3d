@@ -7,6 +7,16 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Added
+- **Relocation Engine (CRP)** — Giai đoạn 2, lõi giá trị: `RelocationService.plan(lotId)` tính chuỗi di chuyển tối thiểu (heuristic greedy) để giải phóng một lô bị chặn; `BlockingGraph` (logic blocking thuần) + `LotBox`. Chỉ đề xuất, không ghi ledger.
+- API `GET /api/relocation-plan?lotId={id}` trả `RelocationPlan` (các bước dời).
+- ADR-0001 (chọn greedy heuristic cho CRP), `docs/algorithm-spec.md` (đặc tả đầy đủ), `docs/dev-log.md`.
+- Repository queries: `Placement.findByBin_LaneId`, `Location.findEmptyInLane` / `findEmpty`.
+- Test (Testcontainers + unit thuần): `BlockingGraphTest`, `RelocationServiceTest`.
+
+### Changed
+- Luật blocking on-top dùng `>=` (lô xếp khít = chặn) thay vì `>`; vẫn giữ "2 lô cùng tầng không chặn" nhờ kiểm overlap (x,y). Xem Dev Log 2026-06-22.
+
 ## [0.1.0] - 2026-06-21
 MVP — Giai đoạn 1: hiển thị kho 3D từ dữ liệu thật.
 
