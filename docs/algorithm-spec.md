@@ -1,6 +1,8 @@
-# Đặc tả thuật toán — Relocation Engine (CRP)
+# Đặc tả thuật toán — Relocation (CRP) & Putaway (SLAP)
 
-> Tài liệu đặc tả chi tiết cho thuật toán lõi. Theo khung trong [03-documentation.md](./03-documentation.md) §6. Quyết định chọn greedy ghi ở [ADR-0001](./adr/0001-greedy-crp-heuristic.md). Thuật ngữ giải thích trong [glossary.md](./glossary.md).
+> Tài liệu đặc tả chi tiết cho 2 thuật toán lõi. Theo khung trong [03-documentation.md](./03-documentation.md) §6. Quyết định chọn greedy cho CRP ghi ở [ADR-0001](./adr/0001-greedy-crp-heuristic.md). Thuật ngữ giải thích trong [glossary.md](./glossary.md).
+>
+> **Phần A — CRP (Relocation Engine):** §1–8 dưới đây. **Phần B — SLAP (Putaway Engine):** §9.
 
 ## 1. Bài toán (input / output)
 
@@ -78,3 +80,42 @@ Hiện thực trong `BlockingGraphTest` (logic thuần) + `RelocationServiceTest
 ## 8. API
 
 `GET /api/relocation-plan?lotId={id}` → `RelocationPlan` (JSON). `404` nếu lô/placement không tồn tại; `400` nếu không giải được (hết vị trí tạm). Chỉ đọc — không thay đổi trạng thái kho.
+
+---
+
+# Phần B — SLAP (Putaway Engine)
+
+## 9. SLAP — chấm điểm chọn vị trí cất
+
+### 9.1. Bài toán
+**SLAP — Storage Location Assignment Problem** (bài toán gán vị trí lưu trữ): chọn vị trí trống để cất một lô mới sao cho **tổng chi phí vận hành kỳ vọng nhỏ nhất**. NP-hard ở dạng tổng quát.
+
+- **Input:** `lotId` của lô cần cất.
+- **Output:** `PutawaySuggestion` = `recommendedBinId` (vị trí điểm thấp nhất) + danh sách `candidates` đã xếp hạng (binId, score). Chỉ đề xuất — không tự cất.
+
+### 9.2. Cách giải v1 — chấm điểm greedy
+Với mỗi vị trí trống khả thi `c` (đã lọc cứng: lô phải **vừa** bin):
+```
+score(c) = w1·distToDock(c)              # gần dock (gốc 0,0,0) thì rẻ
+         + w2·blockingPenalty(c, lô)     # phạt nếu đặt vào c sẽ chặn / bị chặn (dùng BlockingGraph)
+         + w3·retrievalMisalignment(c,lô)# FEFO: lô có expiry nên ở z thấp (dễ lấy)
+         + w4·fitPenalty(c, lô)          # phạt thể tích thừa (bin to hơn lô)
+```
+Chọn `c` có `score` **nhỏ nhất**. Trọng số `w1..w4` cấu hình qua `app.putaway.*` trong `application.yml`.
+
+- **distToDock:** khoảng cách Euclid từ `(x,y,z)` của bin tới gốc tọa độ (dock giả định ở 0,0,0).
+- **retrievalMisalignment (v1):** `z * urgency`, với `urgency = 2` nếu lô có `expiry` (nhạy FEFO), ngược lại `1`. → lô hết hạn sớm bị phạt mạnh hơn khi đặt cao → đẩy xuống thấp.
+- **fitPenalty:** `max(0, thể_tích_bin − thể_tích_lô)` → ưu tiên bin vừa khít, đỡ phí chỗ.
+- **Lọc cứng (fit):** `lô.w ≤ bin.w && lô.d ≤ bin.d && lô.h ≤ bin.h`; không vừa thì loại khỏi ứng viên.
+
+### 9.3. Độ phức tạp
+`O(F·k)` — `F` = số vị trí trống khả thi (sau lọc), mỗi đánh giá `O(k)` với `k` = số lô trong lane (cho blockingPenalty). Thực tế nhỏ. Tuyến tính → real-time.
+
+### 9.4. Trade-off
+Greedy + tuyến tính: **giải thích được** (mỗi điểm là tổng các chi phí rõ ràng), nhanh, cấu hình được theo kho. Không tối ưu toàn cục (vd không xét tương tác giữa nhiều lô cất cùng lúc). Đủ cho v1; có thể nâng cấp gán theo lô hàng loạt sau.
+
+### 9.5. Test case
+`PutawayServiceTest` (Testcontainers): (1) chọn bin gần dock + thấp nhất; (2) bỏ qua bin nhỏ hơn lô; (3) không bin nào vừa → `recommendedBinId = null`.
+
+### 9.6. API
+`GET /api/putaway-suggestion?lotId={id}` → `PutawaySuggestion`. `404` nếu lô không tồn tại. Chỉ đọc.

@@ -13,6 +13,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 - ADR-0001 (chọn greedy heuristic cho CRP), `docs/algorithm-spec.md` (đặc tả đầy đủ), `docs/dev-log.md`.
 - Repository queries: `Placement.findByBin_LaneId`, `Location.findEmptyInLane` / `findEmpty`.
 - Test (Testcontainers + unit thuần): `BlockingGraphTest`, `RelocationServiceTest`.
+- **Putaway Engine (SLAP)** — Giai đoạn 2: `PutawayService.suggest(lotId)` chấm điểm các vị trí trống (distToDock + blockingPenalty + FEFO-theo-z + fitPenalty, lọc cứng theo kích thước) và đề xuất vị trí điểm thấp nhất. Trọng số cấu hình qua `app.putaway.*`. Chỉ đề xuất.
+- API `GET /api/putaway-suggestion?lotId={id}` trả `PutawaySuggestion` (vị trí khuyến nghị + ứng viên xếp hạng).
+- `docs/algorithm-spec.md` bổ sung Phần B (SLAP); `PutawayServiceTest` (Testcontainers).
 
 ### Changed
 - Luật blocking on-top dùng `>=` (lô xếp khít = chặn) thay vì `>`; vẫn giữ "2 lô cùng tầng không chặn" nhờ kiểm overlap (x,y). Xem Dev Log 2026-06-22.
