@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-22
+Giai đoạn 2 — Lõi thuật toán: Relocation Engine (CRP) + Putaway Engine (SLAP).
+
 ### Added
 - **Relocation Engine (CRP)** — Giai đoạn 2, lõi giá trị: `RelocationService.plan(lotId)` tính chuỗi di chuyển tối thiểu (heuristic greedy) để giải phóng một lô bị chặn; `BlockingGraph` (logic blocking thuần) + `LotBox`. Chỉ đề xuất, không ghi ledger.
 - API `GET /api/relocation-plan?lotId={id}` trả `RelocationPlan` (các bước dời).
