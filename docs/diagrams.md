@@ -1,12 +1,14 @@
 # Sơ đồ thiết kế — Stockpile-3D
 
-> Sơ đồ trực quan cho data model + kiến trúc. Phần class/ERD/component có thêm
-> mô hình Astah ở [`diagrams/stockpile-3d.asta`](./diagrams/stockpile-3d.asta)
-> (mở bằng Astah để chỉnh/export ảnh). Use case / activity / sequence chỉ có ở
-> dạng Mermaid dưới đây vì bộ Astah MCP không tạo được các sơ đồ hành vi này.
+> Sơ đồ trực quan (Mermaid — xem trực tiếp trên GitHub) cho data model, kiến trúc, và **2 thuật toán lõi**. Phần class/ERD/component có thêm mô hình Astah ở [`diagrams/stockpile-3d.asta`](./diagrams/stockpile-3d.asta) (mở bằng Astah để chỉnh/export ảnh).
 >
-> Nguồn sự thật về thiết kế vẫn là [01-overview.md](./01-overview.md) §6 và các
-> ADR; sơ đồ ở đây diễn giải lại cho dễ nhìn.
+> **Mục lục:**
+> - Cấu trúc: §1 Class domain · §2 ERD gọn · §3 Class service · §4 Component
+> - Nghiệp vụ: §5 Use case · §6 Activity · §7 Sequence (putaway) · §8 **State — vòng đời lô**
+> - Thuật toán: §9 **Flowchart CRP** · §10 **Sequence CRP (đề xuất→xác nhận)** · §11 **Flowchart SLAP**
+> - Tham chiếu: §12 **ERD đầy đủ cột**
+>
+> Nguồn sự thật về thiết kế: [01-overview.md](./01-overview.md) §6, [data-model.md](./data-model.md), [algorithm-spec.md](./algorithm-spec.md), [architecture.md](./architecture.md) và các [ADR](./adr/).
 
 ## 1. Class diagram — Domain (entities)
 
@@ -249,6 +251,155 @@ sequenceDiagram
     PS->>PR: save(placement @ toBin)
     PS-->>MS: done
     MS-->>User: Movement đã ghi
+```
+
+## 8. State diagram — vòng đời một lô (lot lifecycle)
+
+Lô đi qua các trạng thái theo loại movement. CRP/SLAP làm việc ở trạng thái `Placed`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> InWarehouse: INBOUND
+    InWarehouse --> Placed: PUTAWAY
+    Placed --> Placed: RELOCATE (đổi bin — bước của CRP)
+    Placed --> Picked: PICK
+    Picked --> [*]: OUTBOUND
+    note right of Placed
+        Có placement (chiếm 1 bin).
+        Có thể chặn / bị chặn lô khác.
+    end note
+    note left of InWarehouse
+        Đã vào kho, có thể chưa cất
+        (staging — chưa có placement).
+    end note
+```
+
+## 9. Flowchart — thuật toán CRP (Relocation) từng bước
+
+Vòng lặp greedy: dời blocker trực tiếp ưu tiên nhất tới vị trí tạm, lặp đến khi lô đích hết bị chặn.
+
+```mermaid
+flowchart TD
+    A([plan lotId]) --> B{"placement của lot tồn tại?"}
+    B -- không --> B404[/"404 NotFound"/]
+    B -- có --> C["Load tất cả lô trong lane → List LotBox"]
+    C --> D{"target còn blocker trực tiếp?"}
+    D -- không --> E([Trả RelocationPlan steps])
+    D -- có --> F["pickBlocker: chọn lô lấy-muộn-nhất,<br/>tie-break z cao nhất"]
+    F --> G{"tìm vị trí tạm<br/>không tạo blocking mới?"}
+    G -- không có --> G400[/"400 IllegalState"/]
+    G -- có --> H["thêm step (lô, binCũ, dest)"]
+    H --> I["mô phỏng dời lô in-memory"]
+    I --> D
+```
+
+## 10. Sequence — CRP đề xuất rồi người dùng xác nhận (luồng đầy đủ)
+
+Thể hiện tách bạch "đề xuất" (chỉ đọc) và "thực thi" (người dùng xác nhận → ghi ledger).
+
+```mermaid
+sequenceDiagram
+    actor U as Operator
+    participant FE as 3D Scene
+    participant RC as RelocationController
+    participant RS as RelocationService
+    participant DB as PostgreSQL
+
+    U->>FE: muốn lấy lô A
+    FE->>RC: GET /api/relocation-plan?lotId=A
+    RC->>RS: plan(A)
+    RS->>DB: đọc placement + lô trong lane (read-only)
+    RS-->>RC: RelocationPlan [steps]
+    RC-->>FE: 200 + các bước
+    FE-->>U: hiển thị animation các bước dời
+    Note over U,FE: Engine chỉ ĐỀ XUẤT. Chưa có gì thay đổi.
+    U->>FE: xác nhận thực hiện từng bước
+    FE->>RC: POST /api/movements (RELOCATE ...) cho mỗi bước
+    Note over RC,DB: lúc này mới ghi ledger + cập nhật placement
+```
+
+## 11. Flowchart — thuật toán SLAP (Putaway) chấm điểm
+
+```mermaid
+flowchart TD
+    A([suggest lotId]) --> B{"lot tồn tại?"}
+    B -- không --> B404[/"404"/]
+    B -- có --> C["Load các location trống"]
+    C --> D["Với mỗi location c:"]
+    D --> E{"lô có VỪA bin c?<br/>(w,d,h ≤ bin)"}
+    E -- không --> D
+    E -- có --> F["score = w1·distToDock + w2·blocking<br/>+ w3·FEFO(z) + w4·fitPenalty"]
+    F --> D
+    D --> G["sắp xếp ứng viên theo score tăng dần"]
+    G --> H([Trả recommendedBin = score nhỏ nhất<br/>+ danh sách xếp hạng])
+```
+
+## 12. ERD đầy đủ (mọi cột)
+
+Phiên bản chi tiết hơn §2 — đủ cột + khóa, khớp [data-model.md](./data-model.md) và Flyway `V1`.
+
+```mermaid
+erDiagram
+    sku ||--o{ lot : sku_id
+    lot ||--|| placement : "lot_id (UNIQUE)"
+    lot ||--o{ movement : lot_id
+    location ||--o{ placement : bin_id
+    location ||--o{ movement : "from_bin / to_bin"
+
+    sku {
+        bigint id PK
+        varchar code UK
+        varchar name
+        numeric w
+        numeric d
+        numeric h
+        numeric weight
+        varchar handling "FIFO|FEFO"
+    }
+    location {
+        bigint id PK
+        varchar zone
+        varchar aisle
+        varchar rack
+        varchar level
+        varchar bin
+        numeric x
+        numeric y
+        numeric z
+        numeric w
+        numeric d
+        numeric h
+        varchar lane_id "INDEX"
+        varchar access_face "N|S|E|W|TOP"
+    }
+    lot {
+        bigint id PK
+        bigint sku_id FK
+        numeric w
+        numeric d
+        numeric h
+        numeric weight
+        date expiry
+        timestamptz predicted_retrieval_at
+    }
+    placement {
+        bigint id PK
+        bigint lot_id FK_UK
+        bigint bin_id FK
+        numeric x
+        numeric y
+        numeric z
+    }
+    movement {
+        bigint id PK
+        bigint lot_id FK
+        varchar type "5 loại"
+        bigint from_bin FK
+        bigint to_bin FK
+        timestamptz ts
+        varchar actor
+        varchar scan_ref
+    }
 ```
 
 ---
