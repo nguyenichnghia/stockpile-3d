@@ -46,12 +46,27 @@ Nguyên tắc dữ liệu: mọi thay đổi vật lý ghi vào **movement ledge
 
 **Yêu cầu:** JDK 25 · Maven · Node.js · PostgreSQL.
 
-### 1. Database
+### Cách nhanh nhất — Docker Compose (1 lệnh)
+Chạy cả Postgres + backend + frontend bằng một lệnh (cần Docker Desktop):
+```bash
+docker compose up --build
+```
+- Frontend (3D viewer): http://localhost:3000
+- Backend API: http://localhost:8080 · Swagger UI: http://localhost:8080/swagger-ui.html
+- Health: http://localhost:8080/api/health → `{"status":"UP"}`
+
+Đổi mật khẩu DB qua biến môi trường `POSTGRES_PASSWORD` (mặc định `postgres` chỉ cho dev). Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu DB).
+
+---
+
+### Hoặc chạy thủ công (không Docker)
+
+#### 1. Database
 ```bash
 createdb stockpile_3d
 ```
 
-### 2. Backend (`src/backend`)
+#### 2. Backend (`src/backend`)
 ```bash
 cd src/backend
 cp .env.example .env.local          # rồi điền DB_USER / DB_PASSWORD (đã gitignore)
@@ -66,7 +81,7 @@ Kiểm tra app đã lên:
 - `GET http://localhost:8080/api/health` → `{"status":"UP"}`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 
-### 3. Frontend (`src/frontend`)
+#### 3. Frontend (`src/frontend`)
 ```bash
 cd src/frontend
 npm install
@@ -80,7 +95,7 @@ npm run dev          # http://localhost:3000
 - **CRP — Container/Block Relocation Problem** (Relocation Engine): cho lô mục tiêu cần rút, tính chuỗi di chuyển **tối thiểu** để giải phóng nó. Bài toán **NP-hard**; v1 dùng **heuristic greedy** trên đồ thị blocking cục bộ theo lane (mục tiêu < 500 ms cho lane ≤ 100 lô). Output là danh sách bước → animation 3D.
 - **SLAP — Storage Location Assignment Problem** (Putaway Engine): chấm điểm các vị trí trống và chọn vị trí chi phí thấp nhất (`O(F·k)`), có thể giải thích cho người vận hành.
 
-Đặc tả đầy đủ (pseudocode, Big-O, test case) sẽ ở `docs/algorithm-spec.md` khi engine hoàn thành. Xem [docs/01-overview.md](docs/01-overview.md) §8.
+Đặc tả đầy đủ (pseudocode, Big-O, test case): [docs/algorithm-spec.md](docs/algorithm-spec.md). Tổng quan: [docs/01-overview.md](docs/01-overview.md) §8.
 
 ## Tài liệu
 

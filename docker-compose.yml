@@ -1,0 +1,56 @@
+# Chạy toàn bộ Stockpile-3D bằng một lệnh: `docker compose up --build`
+#   - postgres : database stockpile_3d (có healthcheck)
+#   - backend  : Spring Boot API (cổng 8080), chờ postgres sẵn sàng
+#   - frontend : Next.js 3D viewer (cổng 3000)
+#
+# Mật khẩu DB lấy từ biến môi trường POSTGRES_PASSWORD (mặc định 'postgres' cho dev).
+# KHÔNG dùng mặc định này ở production.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: stockpile_3d
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ đặt data trong subdir version-specific; mount ở cấp cha
+      # (KHÔNG phải .../data như image <=17, sẽ khiến container exit).
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stockpile_3d"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./src/backend
+    environment:
+      # Trong mạng nội bộ của Docker, host của DB là tên service 'postgres'.
+      DATABASE_URL: jdbc:postgresql://postgres:5432/stockpile_3d
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Cho phép frontend container gọi API.
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./src/frontend
+      args:
+        # Trình duyệt người dùng gọi backend qua localhost (cổng đã publish).
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
