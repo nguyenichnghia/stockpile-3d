@@ -11,9 +11,12 @@
 | 01 | [Tổng quan & Thiết kế](./01-overview.md) | Vấn đề, định vị, **data model**, **NFR**, kiến trúc, **formulation thuật toán + Big-O**, roadmap, rủi ro | Hiểu *cái gì* và *vì sao* |
 | 02 | [Git Workflow](./02-git-workflow.md) | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
 | 03 | [Quy trình tài liệu hóa](./03-documentation.md) | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
-| — | [Sơ đồ thiết kế](./diagrams.md) | Class (domain/service), ERD, component, use case, activity, sequence (Mermaid) + mô hình Astah `diagrams/*.asta` | Khi cần nhìn trực quan data model & kiến trúc |
+| — | [Nghiệp vụ kho](./business.md) | Quy trình WMS (5 loại movement), vai trò người dùng, vòng đời lô, FIFO/FEFO, ground-truth | Hiểu *nghiệp vụ* hệ thống hỗ trợ |
+| — | [Data model](./data-model.md) | 5 bảng: từng cột/ràng buộc/index + **lý do thiết kế** + vòng đời dữ liệu | Khi làm việc với schema/DB |
+| — | [Kiến trúc hệ thống](./architecture.md) | 3 tầng, luồng dữ liệu (write/read/decision), invariant, NFR, **API reference**, deploy | Khi cần bức tranh kỹ thuật toàn cảnh |
+| — | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, **worked example từng bước**, Big-O, trade-off, test case | Khi cần hiểu sâu Relocation/Putaway Engine |
+| — | [Sơ đồ thiết kế](./diagrams.md) | 12 sơ đồ Mermaid: class/ERD/component/use case/activity/sequence/**state/flowchart thuật toán** + Astah | Khi cần nhìn trực quan |
 | — | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Khi gặp thuật ngữ chưa rõ |
-| — | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, Big-O, trade-off, test case | Khi cần hiểu sâu Relocation/Putaway Engine |
 | — | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Khi muốn xem các bug đã gặp & cách xử lý |
 | — | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu nghiệp vụ/công nghệ map vào dự án | Khi muốn học thêm để hiểu dự án |
 

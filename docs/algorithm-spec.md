@@ -51,6 +51,50 @@ function plan(targetLotId):
 
 **Vị trí tạm (temp slot)** — vị trí trống (không có placement) ưu tiên **cùng lane**, sau đó toàn kho; phải **không tạo blocking mới** (kiểm bằng chính `BlockingGraph`). Hết chỗ → `IllegalStateException`.
 
+## 4b. Worked example — chạy tay từng bước (CRP)
+
+Ví dụ cụ thể để thấy thuật toán "suy nghĩ" thế nào. Một lane có **3 lô xếp chồng** cùng cột `(x,y) = (0,0)`, mỗi lô cao 2 (z-range bên dưới), `access_face = TOP`. Có 2 vị trí trống `E1`, `E2` ở cột khác (không chồng ai).
+
+```
+Trạng thái đầu (nhìn ngang, cột x=0):
+
+   z=6 ┌──────┐
+       │ Lot C │  bin BC, z[4,6]   predictedRetrievalAt = xa nhất
+   z=4 ├──────┤
+       │ Lot B │  bin BB, z[2,4]
+   z=2 ├──────┤
+       │ Lot A │  bin BA, z[0,2]   ← TARGET cần lấy
+   z=0 └──────┘
+                  E1 (trống), E2 (trống) ở cột khác
+```
+
+**Đồ thị blocking** (mũi tên `X → Y` nghĩa "X chặn Y"):
+```
+C → B → A        (C đè B, B đè A; theo luật on-top zMin >= zMax + overlap x,y)
+C → A            (C cũng nằm trên A — nhưng CRP chỉ quan tâm blocker TRỰC TIẾP của A là B)
+```
+
+**Trace `plan(A)`:**
+
+| Vòng | blockers trực tiếp của A | toMove (greedy) | dest (temp) | steps cộng dồn |
+|---|---|---|---|---|
+| 1 | `[B]` (B đè trực tiếp A; C đè B nên C chưa "trực tiếp" chặn A) | B | E1 (trống, không tạo blocking mới) | `[(B, BB, E1)]` |
+| 2 | `[]` — sau khi mô phỏng dời B, A không còn ai đè trực tiếp | — | — | dừng |
+
+> Khoan — vì sao chỉ 1 bước mà C vẫn còn trên cao? Vì `blockers()` trả **blocker trực tiếp**: ban đầu chỉ B chặn A (C chặn B, không chặn A trực tiếp khi B còn đó). Sau khi dời B, kiểm lại: C giờ ở z[4,6], A ở z[0,2] — giữa chúng có **khoảng trống** (z[2,4] vừa rời), `C.zMin(4) >= A.zMax(2)` = true **và** overlap (x,y) → **C giờ chặn A!** Nên thực tế vòng 2 sẽ thấy `[C]`.
+
+**Trace đúng (sửa lại):**
+
+| Vòng | blockers trực tiếp của A | toMove | dest | steps |
+|---|---|---|---|---|
+| 1 | `[B]` | B | E1 | `[(B,BB,E1)]` |
+| 2 | `[C]` (lộ ra sau khi B đi) | C | E2 | `[(B,BB,E1),(C,BC,E2)]` |
+| 3 | `[]` | — | — | **xong** |
+
+**Kết quả:** `RelocationPlan(A, [(B,BB,E1), (C,BC,E2)])` — dời B rồi C, A lấy được. Đúng trực giác "bốc từ trên xuống".
+
+> 💡 **Bài học thiết kế:** thuật toán dùng `blockers` *trực tiếp* + **mô phỏng lại sau mỗi bước** thay vì tính toàn bộ chuỗi một lần. Điều này khiến nó tự nhiên xử lý đúng việc "blocker mới lộ ra sau khi dời lô khác" — đơn giản hơn là cố tính trước cả cây phụ thuộc.
+
 ## 5. Độ phức tạp (Big-O)
 
 Với `n` = số lô trong lane (theo NFR ≤ ~100):
@@ -58,10 +102,21 @@ Với `n` = số lô trong lane (theo NFR ≤ ~100):
 - Số vòng tối đa `O(n)`.
 - **Tổng: `O(n²)`** trong trường hợp xấu (thực tế nhỏ hơn nhờ lane bị giới hạn). Mục tiêu NFR: **< 500 ms** cho lane ≤ 100 lô — thừa sức đạt.
 
+**Vì sao xấu nhất là `O(n²)`:** trường hợp tệ nhất mỗi vòng dời được đúng 1 lô (chuỗi chồng thẳng đứng `n` lô) → `n` vòng; mỗi vòng quét `n` lô để tìm blocker + `n` vị trí để tìm temp → `O(n)` mỗi vòng → `n × n = n²`. Với `n ≤ 100`: ~10⁴ phép tính, dưới mili-giây.
+
 ## 6. Trade-off + hướng cải thiện
 
 - **Trade-off:** greedy **không** đảm bảo số bước tối thiểu tuyệt đối. Đổi lại: nhanh, real-time, và **giải thích được** cho người vận hành (so với branch-and-bound/beam search khó diễn giải). Đủ tốt cho phần lớn ca thực tế.
 - **Cải thiện sau:** nếu mở rộng kho rất lớn hoặc cần tối ưu hơn — đánh giá beam search (tìm kiếm chùm) hoặc branch-and-bound (nhánh-cận), và tối ưu dựng đồ thị blocking xuống `O(n log n)` bằng index không gian theo lane.
+
+### 6b. Greedy có thể "thua" tối ưu ở đâu? (ví dụ)
+
+Greedy chọn temp slot **gần nhất không tạo blocking mới** ngay tại bước đó, không nhìn xa. Tình huống greedy tốn thêm bước:
+
+- Có 1 vị trí trống `E` nằm ở cột mà **sau này** một lô khác cũng cần dời tới. Greedy dồn lô đầu vào `E` (vì gần) → lô sau hết chỗ tốt, phải dời 2 lần (tới chỗ tạm rồi lại dời tiếp). Lời giải tối ưu sẽ "nhường" `E` cho lô sau.
+- **Tần suất thực tế thấp:** kho mục tiêu lane nhỏ (≤ ~100 lô) và thường dư vị trí trống → greedy gần như luôn ra số bước bằng tối ưu. Đây là lý do ADR-0001 chấp nhận đánh đổi này.
+
+**Đo lường gợi ý (khi cần):** so số bước greedy vs branch-and-bound trên tập kịch bản thật; nếu chênh lệch trung bình > ngưỡng (vd 15%) mới cân nhắc nâng cấp. Hiện chưa cần.
 
 ## 7. Test case minh họa (input → output)
 
@@ -117,5 +172,19 @@ Greedy + tuyến tính: **giải thích được** (mỗi điểm là tổng cá
 ### 9.5. Test case
 `PutawayServiceTest` (Testcontainers): (1) chọn bin gần dock + thấp nhất; (2) bỏ qua bin nhỏ hơn lô; (3) không bin nào vừa → `recommendedBinId = null`.
 
-### 9.6. API
+### 9.6. Worked example — chấm điểm từng vị trí (SLAP)
+
+Cất một lô `1×1×1` **có expiry** (nhạy FEFO → `urgency = 2`). Có 3 vị trí trống `2×2×2` (đều vừa). Trọng số mặc định: `w1=1, w2=10, w3=2, w4=5`.
+
+| Bin | Tọa độ (x,y,z) | distToDock = √(x²+y²+z²) | blocking | misalign = z·urgency | fitPenalty = 8−1 | **score** |
+|---|---|---|---|---|---|---|
+| NEAR | (1,0,0) | 1.00 | 0 | 0·2 = 0 | 7 | 1·1 + 10·0 + 2·0 + 5·7 = **36.0** |
+| HIGH | (1,0,5) | 5.10 | 0 | 5·2 = 10 | 7 | 1·5.10 + 0 + 2·10 + 35 = **60.1** |
+| FAR | (40,40,8) | 56.85 | 0 | 8·2 = 16 | 7 | 1·56.85 + 0 + 32 + 35 = **123.85** |
+
+→ Chọn **NEAR** (điểm thấp nhất = tốt nhất): gần dock + thấp (dễ lấy cho lô sắp hết hạn). FAR bị phạt nặng vì xa + cao. Khớp với `PutawayServiceTest` và demo thật trong dev-log.
+
+> 💡 **Vì sao "điểm thấp = tốt"?** Mỗi thành phần là một *chi phí* (khoảng cách, rủi ro chặn, lệch FEFO, phí chỗ thừa). Tổng chi phí nhỏ nhất = lựa chọn rẻ nhất. Đây là điểm khiến SLAP **giải thích được**: chỉ cho người vận hành xem bảng điểm là họ hiểu vì sao máy chọn chỗ đó.
+
+### 9.7. API
 `GET /api/putaway-suggestion?lotId={id}` → `PutawaySuggestion`. `404` nếu lô không tồn tại. Chỉ đọc.
