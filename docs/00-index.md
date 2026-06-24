@@ -13,10 +13,11 @@
 | 03 | [Quy trình tài liệu hóa](./03-documentation.md) | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
 | — | [Sơ đồ thiết kế](./diagrams.md) | Class (domain/service), ERD, component, use case, activity, sequence (Mermaid) + mô hình Astah `diagrams/*.asta` | Khi cần nhìn trực quan data model & kiến trúc |
 | — | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Khi gặp thuật ngữ chưa rõ |
-| — | [Đặc tả thuật toán](./algorithm-spec.md) | CRP: bài toán, NP-hard, pseudocode, Big-O, trade-off, test case | Khi cần hiểu sâu Relocation Engine |
+| — | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, Big-O, trade-off, test case | Khi cần hiểu sâu Relocation/Putaway Engine |
 | — | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Khi muốn xem các bug đã gặp & cách xử lý |
+| — | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu nghiệp vụ/công nghệ map vào dự án | Khi muốn học thêm để hiểu dự án |
 
-> **Đã có:** `docs/algorithm-spec.md` (CRP — viết khi xong Relocation Engine). SLAP sẽ bổ sung khi xong Putaway Engine. ADR cụ thể trong `docs/adr/`.
+> **Đã có:** `docs/algorithm-spec.md` (CRP + SLAP). ADR cụ thể trong `docs/adr/`.
 
 ---
 
