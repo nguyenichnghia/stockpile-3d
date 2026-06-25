@@ -2,6 +2,37 @@
 
 > Mô tả chi tiết schema PostgreSQL (5 bảng, Flyway `V1`), từng cột + ràng buộc + **lý do thiết kế**. Nguồn code: [V1__core_schema.sql](../src/backend/src/main/resources/db/migration/V1__core_schema.sql) và entities trong `src/backend/.../inventory/domain/`. Tổng quan: [01-overview.md §6](./01-overview.md). Nghiệp vụ: [business.md](./business.md).
 
+---
+
+## 📖 Nói nôm na (đọc cái này trước)
+
+"Data model" = **cách phần mềm lưu thông tin trong database, dưới dạng các bảng** (giống các sheet trong Excel: mỗi bảng có nhiều cột, mỗi dòng là một bản ghi).
+
+Hệ thống có **5 bảng**, hãy hình dung như 5 cuốn sổ trong kho:
+
+| Bảng | Nói nôm na là gì | Ví dụ một dòng |
+|---|---|---|
+| **sku** | Danh mục **loại sản phẩm** (như "menu") | "Sữa tươi TH, hộp 1L, hàng FEFO" |
+| **location** | Danh sách **các ô chứa** trong kho (như sơ đồ chỗ ngồi) | "Ô Zone A - Kệ 3 - Tầng 2, ở tọa độ (5,3,2)" |
+| **lot** | Một **kiện hàng cụ thể** đang/​sẽ ở trong kho | "Kiện sữa #1234, hết hạn 1/7/2026" |
+| **placement** | Bảng "**hiện giờ kiện nào nằm ô nào**" | "Kiện #1234 đang ở ô Zone A-3-2" |
+| **movement** | **Sổ nhật ký** mọi lần hàng di chuyển | "10h: cất kiện #1234 vào ô A-3-2" |
+
+Quan hệ giữa chúng (đọc là "có"):
+- Một **sku** *có nhiều* **lot** (một loại sữa có nhiều kiện).
+- Một **lot** *nằm ở một* **location** (qua bảng **placement**).
+- Mọi thay đổi *được ghi vào* **movement**.
+
+Vài từ kỹ thuật sẽ gặp bên dưới, dịch nhanh:
+- **PK** (primary key — khóa chính): cột số định danh duy nhất mỗi dòng (như số thứ tự).
+- **FK** (foreign key — khóa ngoại): cột "trỏ tới" dòng ở bảng khác (như "kiện này thuộc loại sữa nào").
+- **UNIQUE**: không cho trùng (vd một kiện không thể ở 2 ô cùng lúc).
+- **index**: "mục lục" giúp tìm nhanh (như mục lục sách).
+
+> Phần dưới là chi tiết từng cột + lý do thiết kế. Người mới có thể đọc lướt bảng tóm tắt trên là đủ.
+
+---
+
 ## Nguyên tắc thiết kế chung
 
 - **Khóa chính `BIGINT GENERATED ALWAYS AS IDENTITY`** (số tự tăng) — nhẹ, index nhanh, join rẻ. Đủ cho single-warehouse; nếu sau cần multi-warehouse/sync thì cân nhắc UUID (ghi [ADR-0002](./adr/0002-backend-spring-boot.md) bối cảnh).

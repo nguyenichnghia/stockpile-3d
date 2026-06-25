@@ -2,6 +2,31 @@
 
 > Cái nhìn kỹ thuật toàn cảnh: tầng, luồng dữ liệu, NFR (yêu cầu phi chức năng), và **API reference**. Bổ sung cho [01-overview.md](./01-overview.md) (định hướng) bằng chi tiết triển khai thực tế. Quyết định lớn: [adr/](./adr/).
 
+---
+
+## 📖 Nói nôm na (đọc cái này trước)
+
+Phần mềm chia làm **3 tầng**, hình dung như một **nhà hàng**:
+
+| Tầng | Như bộ phận nào trong nhà hàng | Làm gì | Công nghệ |
+|---|---|---|---|
+| **Frontend** (giao diện) | **Phòng ăn + phục vụ** — chỗ khách nhìn thấy | Hiển thị kho 3D, nhận thao tác người dùng | Next.js + React Three Fiber (vẽ 3D) |
+| **Backend** (xử lý) | **Bếp** — nơi nấu, khách không thấy | Tính toán (CRP/SLAP), xử lý nghiệp vụ, ghi sổ | Java + Spring Boot |
+| **Database** (kho dữ liệu) | **Kho thực phẩm + sổ sách** | Lưu trữ tất cả dữ liệu lâu dài | PostgreSQL |
+
+Cách chúng nói chuyện:
+- Frontend hỏi Backend qua **REST** (như phục vụ ghi order đưa xuống bếp): "cho tôi danh sách vị trí", "gợi ý chỗ cất kiện này".
+- Backend lưu/đọc từ **Database** (bếp lấy đồ từ kho).
+- Sau này (Phase 3) Backend sẽ **chủ động báo** Frontend khi có thay đổi, qua **WebSocket** (như bếp bấm chuông gọi phục vụ ra lấy món) — thay vì Frontend phải hỏi đi hỏi lại.
+
+Vài từ trong code (giải thích nhanh):
+- **Controller:** cửa tiếp nhận request (như nhân viên nhận order).
+- **Service:** nơi chứa logic xử lý (như đầu bếp).
+- **Repository:** nơi đọc/ghi database (như người ra kho lấy đồ).
+- **API / endpoint:** một "địa chỉ" mà Frontend gọi để lấy/gửi dữ liệu, vd `GET /api/placements`.
+
+> Phần dưới là chi tiết kỹ thuật: sơ đồ luồng, danh sách API, yêu cầu hiệu năng.
+
 ## 1. Ba tầng
 
 ```mermaid

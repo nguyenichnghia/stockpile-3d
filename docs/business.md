@@ -2,6 +2,26 @@
 
 > Giải thích **nghiệp vụ vận hành kho** (warehouse operations) mà hệ thống hỗ trợ: các quy trình, vai trò, vòng đời dữ liệu. Đọc cùng [01-overview.md](./01-overview.md) (định vị sản phẩm) và [data-model.md](./data-model.md) (cấu trúc dữ liệu). Thuật ngữ: [glossary.md](./glossary.md).
 
+---
+
+## 📖 Nói nôm na (đọc cái này trước)
+
+Tưởng tượng bạn có một **nhà kho chứa các thùng hàng**, và vì muốn tiết kiệm chỗ nên bạn **xếp chồng thùng lên nhau** và **xếp sâu vào trong** — giống xếp các thùng các-tông trong một góc phòng chật.
+
+Vấn đề nảy sinh: khi cần lấy một thùng ở **dưới đáy** hoặc **kẹt phía trong**, bạn phải **bê các thùng đè/chắn nó ra trước**. Làm thủ công thì dễ bê nhầm, bê thừa, mất thời gian.
+
+Phần mềm này giúp 2 việc chính:
+1. **Lúc cất hàng:** mách bạn *nên đặt thùng mới vào đâu* để sau này đỡ phải bê nhiều (gọi là **SLAP**).
+2. **Lúc lấy hàng:** mách bạn *cần bê những thùng nào, theo thứ tự nào* để lấy được thùng mình cần (gọi là **CRP**).
+
+Và một nguyên tắc xương sống: phần mềm **chỉ gợi ý**, con người **xem rồi mới làm**. Máy không tự ý "dời hàng trên màn hình".
+
+Một ý quan trọng nữa: phần mềm ghi lại **mọi lần hàng di chuyển** vào một cuốn "**sổ nhật ký**" (chỉ ghi thêm, không xóa) — giống sổ ghi nợ của tiệm tạp hóa. Nhờ cuốn sổ này, lúc nào cũng dựng lại được "hiện giờ thùng nào đang ở đâu", và nếu nghi ngờ sai thì sổ là bằng chứng cuối cùng.
+
+> Phần dưới đây là chi tiết hơn cho người muốn hiểu sâu. Cứ đọc từ từ.
+
+---
+
 ## 1. Bối cảnh: kho block-stacking
 
 **Block-stacking** (xếp khối / xếp chồng) = hàng được xếp chồng lên nhau và xếp sâu vào trong, **không phải** mỗi vị trí một kệ riêng. Tiết kiệm diện tích nhưng sinh vấn đề: **muốn lấy lô ở dưới/ở trong phải dời các lô đè/chắn trước nó**. Đây chính là nỗi đau mà 2 thuật toán lõi (CRP, SLAP) giải.
@@ -65,7 +85,9 @@ Khi cần lấy một lô bị đè/chắn, câu hỏi: **"phải dời những 
 
 ## 7. Ground-truth: vì sao ledger là nguồn sự thật
 
-Rủi ro lớn nhất của WMS là **lệch giữa hệ thống và thực tế** (system nói lô ở A, thực tế ở B). Stockpile-3D chống lệch bằng:
+> **Nói nôm na:** "ledger" = **cuốn sổ nhật ký** ghi mọi lần hàng di chuyển (chỉ ghi thêm dòng mới, không tẩy xóa). "placement" = **bảng tóm tắt "hiện giờ thùng nào ở đâu"**. Bảng tóm tắt được *tính lại từ cuốn sổ*, nên nếu bảng tóm tắt nghi sai, ta đọc lại cả cuốn sổ từ đầu để dựng lại cho đúng. Sổ luôn thắng. Giống sổ ghi nợ tiệm tạp hóa: số dư hiện tại (tóm tắt) suy ra từ danh sách giao dịch (sổ).
+
+Rủi ro lớn nhất của WMS là **lệch giữa hệ thống và thực tế** (hệ thống nói lô ở A, thực tế ở B). Stockpile-3D chống lệch bằng:
 - **Mọi điểm chạm vật lý đều scan + ghi movement** (append-only, không sửa lịch sử).
 - **`placement` (trạng thái hiện tại) là projection** dựng lại từ ledger — khi nghi ngờ, chạy `rebuildAll()` để dựng lại từ sự thật.
 - Đây là nền cho **cycle counting** (kiểm kê cuốn chiếu) tương lai: so thực tế scan vs projection để phát hiện lệch sớm.

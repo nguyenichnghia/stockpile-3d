@@ -4,6 +4,30 @@
 >
 > **Phần A — CRP (Relocation Engine):** §1–8 dưới đây. **Phần B — SLAP (Putaway Engine):** §9.
 
+---
+
+## 📖 Nói nôm na (đọc cái này trước)
+
+Hệ thống có 2 "bộ não" giải 2 bài toán đời thường:
+
+**① CRP — "Cần bê những thùng nào để lấy được thùng tôi muốn?"**
+Hình dung chồng thùng các-tông: thùng bạn cần ở dưới đáy, trên nó còn 2 thùng khác đè. Muốn lấy → phải bê 2 thùng trên ra chỗ khác trước. CRP tính giúp: *bê thùng nào, bỏ tạm vào đâu, theo thứ tự nào*. Kết quả là một **danh sách bước** (bê thùng A sang ô X, bê thùng B sang ô Y, rồi lấy được thùng đích).
+
+**② SLAP — "Nên cất thùng mới này vào ô nào?"**
+Có một thùng mới cần cất, kho còn nhiều ô trống. Cất chỗ nào? SLAP **chấm điểm từng ô trống** (gần cửa không? có làm kẹt thùng khác không? hàng sắp hết hạn thì để chỗ dễ lấy không? ô có vừa thùng không?) rồi chọn ô **điểm tốt nhất**.
+
+Vài từ sẽ gặp, dịch nhanh:
+- **Blocking (chặn):** thùng B "chặn" thùng A nếu muốn lấy A phải bê B ra trước (B đè lên A, hoặc B đứng chắn lối lấy A).
+- **Greedy (tham lam):** cách giải "chọn nước đi tốt nhất ngay trước mắt" mà không tính xa — nhanh, dễ hiểu, *thường* tốt nhưng không đảm bảo tối ưu tuyệt đối.
+- **NP-hard (bài toán khó):** loại bài toán mà tìm lời giải *hoàn hảo tuyệt đối* sẽ cực chậm khi dữ liệu lớn → nên ta dùng greedy cho "đủ tốt + nhanh".
+- **Big-O:** cách đo "thuật toán chạy chậm đi bao nhiêu khi dữ liệu tăng". `O(n²)` nghĩa là dữ liệu gấp đôi thì chậm gấp ~4 lần.
+
+Nguyên tắc xuyên suốt: 2 bộ não này **chỉ đề xuất**, không tự động làm. Người vận hành xem rồi mới xác nhận.
+
+> Phần dưới là đặc tả kỹ thuật đầy đủ (có ví dụ chạy tay từng bước ở §4b và §9.6 — rất nên xem để hiểu rõ).
+
+---
+
 ## 1. Bài toán (input / output)
 
 **CRP — Container/Block Relocation Problem** (bài toán di dời khối): cho một **lô mục tiêu** (target lot) đang bị các lô khác chặn, tìm **chuỗi di chuyển tối thiểu** để có thể lấy nó ra, sao cho mỗi lô bị dời được đặt vào một vị trí tạm hợp lệ (không gây kẹt mới).
