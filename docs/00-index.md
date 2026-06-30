@@ -4,31 +4,45 @@
 
 ---
 
-## Danh sách tài liệu
+## Danh sách tài liệu — **đánh số theo thứ tự nên đọc**
+
+> Cột **#** = thứ tự đề xuất đọc để **hiểu dự án từ đầu**. Người mới cứ đọc 1 → 11 lần lượt. (Lưu ý: 3 file đầu mang số `01/02/03` trùng với *tên file* — vẫn giữ để khớp tên trên ổ đĩa.)
+
+### A. Hiểu dự án (đọc trước — nên theo thứ tự này)
 
 | # | Tài liệu | Nội dung | Khi nào đọc |
 |---|---|---|---|
-| 01 | [Tổng quan & Thiết kế](./01-overview.md) | Vấn đề, định vị, **data model**, **NFR**, kiến trúc, **formulation thuật toán + Big-O**, roadmap, rủi ro | Hiểu *cái gì* và *vì sao* |
-| 02 | [Git Workflow](./02-git-workflow.md) | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
-| 03 | [Quy trình tài liệu hóa](./03-documentation.md) | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
-| — | [Nghiệp vụ kho](./business.md) | Quy trình WMS (5 loại movement), vai trò người dùng, vòng đời lô, FIFO/FEFO, ground-truth | Hiểu *nghiệp vụ* hệ thống hỗ trợ |
-| — | [Data model](./data-model.md) | 5 bảng: từng cột/ràng buộc/index + **lý do thiết kế** + vòng đời dữ liệu | Khi làm việc với schema/DB |
-| — | [Kiến trúc hệ thống](./architecture.md) | 3 tầng, luồng dữ liệu (write/read/decision), invariant, NFR, **API reference**, deploy | Khi cần bức tranh kỹ thuật toàn cảnh |
-| — | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, **worked example từng bước**, Big-O, trade-off, test case | Khi cần hiểu sâu Relocation/Putaway Engine |
-| — | [Sơ đồ thiết kế](./diagrams.md) | 12 sơ đồ Mermaid: class/ERD/component/use case/activity/sequence/**state/flowchart thuật toán** + Astah | Khi cần nhìn trực quan |
-| — | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Khi gặp thuật ngữ chưa rõ |
-| — | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Khi muốn xem các bug đã gặp & cách xử lý |
-| — | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu nghiệp vụ/công nghệ map vào dự án | Khi muốn học thêm để hiểu dự án |
+| 1 | [Tổng quan & Thiết kế](./01-overview.md) *(file `01`)* | Vấn đề, định vị, data model, NFR, kiến trúc, thuật toán + Big-O, roadmap | Đọc **đầu tiên** — hiểu *cái gì* và *vì sao* |
+| 2 | [Nghiệp vụ kho](./business.md) | Quy trình WMS (5 loại movement), vai trò người dùng, vòng đời lô, FIFO/FEFO, ground-truth | Hiểu *nghiệp vụ* hệ thống hỗ trợ |
+| 3 | [Data model](./data-model.md) | 5 bảng: từng cột/ràng buộc/index + **lý do thiết kế** + vòng đời dữ liệu | Hiểu dữ liệu được lưu thế nào |
+| 4 | [Kiến trúc hệ thống](./architecture.md) | 3 tầng, luồng dữ liệu (write/read/decision), invariant, NFR, **API reference**, deploy | Hiểu hệ thống ráp nối ra sao |
+| 5 | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, **worked example từng bước**, Big-O, trade-off | Hiểu sâu 2 bộ não (Relocation/Putaway) |
+| 6 | [Sơ đồ thiết kế](./diagrams.md) | 12 sơ đồ Mermaid: class/ERD/component/use case/activity/sequence/state/flowchart | Nhìn trực quan mọi thứ ở trên |
 
-> **Đã có:** `docs/algorithm-spec.md` (CRP + SLAP). ADR cụ thể trong `docs/adr/`.
+### B. Tra cứu khi cần (không cần đọc tuần tự)
+
+| # | Tài liệu | Nội dung | Khi nào đọc |
+|---|---|---|---|
+| 7 | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Bất cứ lúc nào gặp từ chưa rõ |
+| 8 | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu map vào dự án | Khi muốn học thêm để hiểu sâu |
+| 9 | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Xem các bug đã gặp & cách xử lý |
+
+### C. Quy trình phát triển (đọc khi bắt tay code/đóng góp)
+
+| # | Tài liệu | Nội dung | Khi nào đọc |
+|---|---|---|---|
+| 10 | [Git Workflow](./02-git-workflow.md) *(file `02`)* | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
+| 11 | [Quy trình tài liệu hóa](./03-documentation.md) *(file `03`)* | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
+
+> **Kế hoạch & tiến độ:** [commit-plan.md](./commit-plan.md) (task theo giai đoạn) · [CHANGELOG](../CHANGELOG.md) (đã làm gì). **Quyết định lớn:** [adr/](./adr/).
 
 ---
 
 ## Cách dùng theo tình huống
 
-- **Mới bắt đầu code:** đọc 01 → 02 → 03 theo thứ tự.
-- **Đã có code, chỉ chuẩn hóa quy trình:** chỉ cần 02 + 03, áp dụng trực tiếp vào repo.
-- **Chuẩn bị phỏng vấn:** 01 để trả lời "dự án giải quyết vấn đề gì + thiết kế ra sao"; ADR (mẫu ở 03) để trả lời "vì sao chọn cách này mà không phải cách khác" — câu hỏi gần như chắc chắn gặp.
+- **Người mới muốn hiểu dự án:** đọc lần lượt **1 → 6** (nhóm A). Mỗi doc kỹ thuật có mục "📖 Nói nôm na" ở đầu — đọc mục đó trước là nắm ý chính.
+- **Bắt tay viết code:** đọc thêm **10 → 11** (nhóm C) để theo đúng quy trình git/tài liệu.
+- **Chuẩn bị phỏng vấn:** doc 1 (vấn đề + thiết kế) + doc 5 (thuật toán) + [adr/](./adr/) (vì sao chọn cách này) — câu hỏi gần như chắc chắn gặp.
 
 ---
 
@@ -41,20 +55,27 @@ stockpile-3d/
 ├── README.md                 # Cổng vào: overview + cách chạy + demo
 ├── CHANGELOG.md              # Keep a Changelog
 ├── .gitignore
+├── docker-compose.yml        # chạy cả hệ thống bằng 1 lệnh
 ├── docs/
 │   ├── 00-index.md           # Mục lục (file này)
-│   ├── 01-overview.md        # Tổng quan & thiết kế
-│   ├── 02-git-workflow.md    # Git workflow
-│   ├── 03-documentation.md   # Quy trình tài liệu hóa
-│   ├── algorithm-spec.md     # Viết khi xong Relocation Engine
-│   ├── api-spec.md           # Tùy chọn, viết khi API ổn định
-│   └── adr/
-│       ├── 0000-template.md
-│       └── 0001-greedy-crp-heuristic.md
+│   ├── 01-overview.md        # 1. Tổng quan & thiết kế
+│   ├── business.md           # 2. Nghiệp vụ kho
+│   ├── data-model.md         # 3. Data model (5 bảng)
+│   ├── architecture.md       # 4. Kiến trúc hệ thống
+│   ├── algorithm-spec.md     # 5. Đặc tả thuật toán CRP + SLAP
+│   ├── diagrams.md           # 6. Sơ đồ (Mermaid + Astah)
+│   ├── glossary.md           # 7. Từ điển thuật ngữ
+│   ├── learning-path.md      # 8. Lộ trình học
+│   ├── dev-log.md            # 9. Dev Log
+│   ├── 02-git-workflow.md    # 10. Git workflow
+│   ├── 03-documentation.md   # 11. Quy trình tài liệu hóa
+│   ├── commit-plan.md        # Kế hoạch task theo giai đoạn
+│   ├── diagrams/             # file Astah (.asta)
+│   └── adr/                  # 0001 greedy CRP · 0002 Spring Boot · 0003 ledger projection
 ├── src/
-│   ├── backend/
-│   ├── frontend/
-│   └── shared/               # type/contract dùng chung BE-FE
+│   ├── backend/              # Java + Spring Boot
+│   ├── frontend/             # Next.js + React Three Fiber
+│   └── shared/
 └── tests/
 ```
 
