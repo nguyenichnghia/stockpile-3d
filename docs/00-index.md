@@ -25,14 +25,15 @@
 |---|---|---|---|
 | 7 | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Bất cứ lúc nào gặp từ chưa rõ |
 | 8 | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu map vào dự án | Khi muốn học thêm để hiểu sâu |
-| 9 | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Xem các bug đã gặp & cách xử lý |
+| 9 | [Đề xuất thiết kế hệ thống](./system-design-proposal.md) | Công nghệ + mẫu thiết kế giúp mạnh/scale/tin cậy hơn (CQRS, Redis, optimistic lock, Kafka, Hexagonal...) — kèm ưu tiên Now/Next/Later | Khi nghĩ về nâng cấp / scale / production |
+| 10 | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Xem các bug đã gặp & cách xử lý |
 
 ### C. Quy trình phát triển (đọc khi bắt tay code/đóng góp)
 
 | # | Tài liệu | Nội dung | Khi nào đọc |
 |---|---|---|---|
-| 10 | [Git Workflow](./02-git-workflow.md) *(file `02`)* | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
-| 11 | [Quy trình tài liệu hóa](./03-documentation.md) *(file `03`)* | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
+| 11 | [Git Workflow](./02-git-workflow.md) *(file `02`)* | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
+| 12 | [Quy trình tài liệu hóa](./03-documentation.md) *(file `03`)* | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
 
 > **Kế hoạch & tiến độ:** [commit-plan.md](./commit-plan.md) (task theo giai đoạn) · [CHANGELOG](../CHANGELOG.md) (đã làm gì). **Quyết định lớn:** [adr/](./adr/).
 
@@ -41,7 +42,8 @@
 ## Cách dùng theo tình huống
 
 - **Người mới muốn hiểu dự án:** đọc lần lượt **1 → 6** (nhóm A). Mỗi doc kỹ thuật có mục "📖 Nói nôm na" ở đầu — đọc mục đó trước là nắm ý chính.
-- **Bắt tay viết code:** đọc thêm **10 → 11** (nhóm C) để theo đúng quy trình git/tài liệu.
+- **Bắt tay viết code:** đọc thêm **11 → 12** (nhóm C) để theo đúng quy trình git/tài liệu.
+- **Nghĩ về nâng cấp/scale:** đọc **9** ([đề xuất thiết kế](./system-design-proposal.md)) sau khi đã nắm hiện trạng (1 → 6).
 - **Chuẩn bị phỏng vấn:** doc 1 (vấn đề + thiết kế) + doc 5 (thuật toán) + [adr/](./adr/) (vì sao chọn cách này) — câu hỏi gần như chắc chắn gặp.
 
 ---
@@ -66,7 +68,8 @@ stockpile-3d/
 │   ├── diagrams.md           # 6. Sơ đồ (Mermaid + Astah)
 │   ├── glossary.md           # 7. Từ điển thuật ngữ
 │   ├── learning-path.md      # 8. Lộ trình học
-│   ├── dev-log.md            # 9. Dev Log
+│   ├── system-design-proposal.md  # 9. Đề xuất thiết kế (scale/production)
+│   ├── dev-log.md            # 10. Dev Log
 │   ├── 02-git-workflow.md    # 10. Git workflow
 │   ├── 03-documentation.md   # 11. Quy trình tài liệu hóa
 │   ├── commit-plan.md        # Kế hoạch task theo giai đoạn
