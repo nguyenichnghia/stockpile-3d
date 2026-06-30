@@ -261,11 +261,11 @@ Lô đi qua các trạng thái theo loại movement. CRP/SLAP làm việc ở tr
 stateDiagram-v2
     [*] --> InWarehouse: INBOUND
     InWarehouse --> Placed: PUTAWAY
-    Placed --> Placed: RELOCATE (đổi bin — bước của CRP)
     Placed --> Picked: PICK
     Picked --> [*]: OUTBOUND
     note right of Placed
         Có placement (chiếm 1 bin).
+        RELOCATE = đổi bin, vẫn ở Placed.
         Có thể chặn / bị chặn lô khác.
     end note
     note left of InWarehouse
