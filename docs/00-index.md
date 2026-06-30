@@ -74,7 +74,7 @@ stockpile-3d/
 │   ├── 03-documentation.md   # 11. Quy trình tài liệu hóa
 │   ├── commit-plan.md        # Kế hoạch task theo giai đoạn
 │   ├── diagrams/             # file Astah (.asta)
-│   └── adr/                  # 0001 greedy CRP · 0002 Spring Boot · 0003 ledger projection
+│   └── adr/                  # 0001 greedy CRP · 0002 Spring Boot · 0003 ledger projection · 0004 client web→PWA→Capacitor
 ├── src/
 │   ├── backend/              # Java + Spring Boot
 │   ├── frontend/             # Next.js + React Three Fiber

@@ -64,6 +64,19 @@
 - **OrbitControls** (điều khiển quỹ đạo) — cho phép xoay/zoom/di chuyển camera quanh cảnh bằng chuột.
 - **Y-up / Z-up** (quy ước trục đứng) — Three.js coi trục Y là "lên trời", còn data kho coi Z là chiều cao → phải đổi trục khi vẽ.
 
+## Mobile / triển khai client (xem [ADR-0004](./adr/0004-client-strategy-web-pwa-capacitor.md))
+
+- **Web app** (ứng dụng web) — chạy trong trình duyệt, không tải/cài; vào bằng địa chỉ web. Stockpile-3D hiện là web app.
+- **Native app** (ứng dụng gốc) — app tải từ App Store/Google Play, cài vào máy; viết bằng Swift (iOS) / Kotlin (Android).
+- **Responsive / mobile-first** (giao diện co giãn / ưu tiên điện thoại) — UI tự thay đổi theo kích thước màn hình; "mobile-first" = thiết kế cho điện thoại trước rồi mới mở rộng lên màn hình lớn.
+- **PWA — Progressive Web App** (web tiến bộ) — web nhưng "cài" được lên màn hình chính, chạy full-screen, hỗ trợ offline; không qua app store.
+- **Service Worker** (tiến trình nền của trình duyệt) — đoạn mã chạy nền giúp PWA cache dữ liệu để **dùng được khi mất mạng** + đồng bộ lại khi có mạng.
+- **getUserMedia** (API camera của web) — cho phép web truy cập camera điện thoại (để quét barcode); yêu cầu HTTPS.
+- **Capacitor** (công cụ bọc web thành app) — đóng gói web app vào "vỏ" native để nộp App Store/Play, dùng lại ~95% code web.
+- **WebView** (trình duyệt nhúng) — thành phần hiển thị web bên trong một app native; Capacitor chạy web của bạn trong WebView.
+- **React Native / Flutter** (framework app đa nền tảng) — viết một lần ra cả iOS + Android; React Native dùng React/JS, Flutter dùng Dart.
+- **MDM — Mobile Device Management** (quản lý thiết bị di động) — hệ thống doanh nghiệp cài/quản app cho thiết bị nhân viên mà không qua app store công khai.
+
 ## Quy trình & công cụ
 
 - **ADR — Architecture Decision Record** (bản ghi quyết định kiến trúc) — tài liệu ngắn ghi *quyết định lớn + lý do + đánh đổi*, không sửa sau khi chốt.
