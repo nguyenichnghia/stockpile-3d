@@ -25,6 +25,7 @@ import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
 import com.stockpile.inventory.service.MovementService;
+import com.stockpile.locate.dto.BinLocateResult;
 import com.stockpile.locate.dto.LocateResult;
 import com.stockpile.locate.service.LocateService;
 
@@ -80,6 +81,27 @@ class LocateServiceTest {
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Test
+	void locatesAnEmptyBinByItsCode() {
+		Location loc = binWithCode("A", "01", "00", "1", "01"); // empty, no lot
+		BinLocateResult result = locateService.locateByBinCode("A-01-00-1-01");
+
+		assertThat(result.found()).isTrue();
+		assertThat(result.binId()).isEqualTo(loc.getId());
+	}
+
+	@Test
+	void unknownBinCodeIsNotFound() {
+		binWithCode("A", "01", "00", "1", "01");
+		assertThat(locateService.locateByBinCode("Z-99-99-9-99").found()).isFalse();
+	}
+
+	@Test
+	void malformedBinCodeIsRejected() {
+		assertThatThrownBy(() -> locateService.locateByBinCode("A-01-00"))
+				.isInstanceOf(IllegalArgumentException.class);
+	}
+
 	// --- helpers ---
 
 	private Sku sku(String code) {
@@ -108,6 +130,25 @@ class LocateServiceTest {
 		l.setD(BigDecimal.ONE);
 		l.setH(BigDecimal.ONE);
 		l.setLaneId("lane-" + System.nanoTime());
+		l.setAccessFace(AccessFace.TOP);
+		return locationRepository.save(l);
+	}
+
+	/** A bin with explicit code parts, so it can be located by "zone-aisle-rack-level-bin". */
+	private Location binWithCode(String zone, String aisle, String rack, String level, String bin) {
+		Location l = new Location();
+		l.setZone(zone);
+		l.setAisle(aisle);
+		l.setRack(rack);
+		l.setLevel(level);
+		l.setBin(bin);
+		l.setX(BigDecimal.ZERO);
+		l.setY(BigDecimal.ZERO);
+		l.setZ(BigDecimal.ZERO);
+		l.setW(BigDecimal.ONE);
+		l.setD(BigDecimal.ONE);
+		l.setH(BigDecimal.ONE);
+		l.setLaneId(zone + "-" + aisle + "-" + rack);
 		l.setAccessFace(AccessFace.TOP);
 		return locationRepository.save(l);
 	}
