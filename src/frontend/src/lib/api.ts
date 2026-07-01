@@ -57,3 +57,14 @@ export type LocateResult = {
 /** Locate every placed lot of a SKU code (for highlight/dim on the 3D scene). */
 export const locateBySku = (sku: string) =>
   getJson<LocateResult>(`/api/lots/locate?sku=${encodeURIComponent(sku)}`);
+
+export type HeatmapCell = { binId: number; value: number };
+
+export type HeatmapResult = {
+  metric: string;
+  cells: HeatmapCell[];
+};
+
+/** Per-bin heat values in [0,1] for coloring the whole warehouse by a metric. */
+export const fetchHeatmap = (metric = "fill") =>
+  getJson<HeatmapResult>(`/api/heatmap?metric=${encodeURIComponent(metric)}`);
