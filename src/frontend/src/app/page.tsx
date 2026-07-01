@@ -1,4 +1,4 @@
-import Warehouse3D from "@/components/Warehouse3D";
+import WarehouseView from "@/components/WarehouseView";
 import { fetchLocations, fetchPlacements, type Location, type Placement } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export default async function Home() {
           </div>
         </div>
       ) : (
-        <Warehouse3D locations={locations} placements={placements} />
+        <WarehouseView locations={locations} placements={placements} />
       )}
     </main>
   );
