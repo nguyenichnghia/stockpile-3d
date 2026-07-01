@@ -3,7 +3,12 @@
 import { useState } from "react";
 
 import Warehouse3D from "@/components/Warehouse3D";
-import { locateBySku, type Location, type Placement } from "@/lib/api";
+import {
+  fetchHeatmap,
+  locateBySku,
+  type Location,
+  type Placement,
+} from "@/lib/api";
 
 /**
  * Client wrapper around the 3D scene that adds SKU locate/search: type a SKU
@@ -21,6 +26,25 @@ export default function WarehouseView({
   const [highlighted, setHighlighted] = useState<Set<number> | undefined>();
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [heatmap, setHeatmap] = useState<Map<number, number> | undefined>();
+
+  async function toggleHeatmap() {
+    if (heatmap) {
+      setHeatmap(undefined);
+      return;
+    }
+    // Heatmap and SKU search are separate modes; clear the search first.
+    clear();
+    setBusy(true);
+    try {
+      const result = await fetchHeatmap("fill");
+      setHeatmap(new Map(result.cells.map((c) => [c.binId, c.value])));
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Lỗi tải heatmap");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function search(e: React.FormEvent) {
     e.preventDefault();
@@ -68,28 +92,57 @@ export default function WarehouseView({
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tra mã hàng (SKU)…"
-          style={{
-            padding: "6px 10px",
-            borderRadius: 6,
-            border: "1px solid #33406b",
-            background: "#0f1630",
-            color: "#e6ecff",
-            fontSize: 13,
-          }}
-        />
-        <button type="submit" disabled={busy} style={btnStyle}>
-          {busy ? "…" : "Tìm"}
-        </button>
-        {highlighted && (
-          <button type="button" onClick={clear} style={btnStyle}>
-            Xóa
-          </button>
+        {!heatmap && (
+          <>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Tra mã hàng (SKU)…"
+              style={{
+                padding: "6px 10px",
+                borderRadius: 6,
+                border: "1px solid #33406b",
+                background: "#0f1630",
+                color: "#e6ecff",
+                fontSize: 13,
+              }}
+            />
+            <button type="submit" disabled={busy} style={btnStyle}>
+              {busy ? "…" : "Tìm"}
+            </button>
+            {highlighted && (
+              <button type="button" onClick={clear} style={btnStyle}>
+                Xóa
+              </button>
+            )}
+          </>
         )}
-        {status && (
+        <button type="button" onClick={toggleHeatmap} disabled={busy} style={btnStyle}>
+          {heatmap ? "Tắt heatmap" : "Heatmap mức đầy"}
+        </button>
+        {heatmap && (
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              color: "#9fb0d8",
+              fontSize: 12,
+            }}
+          >
+            <span style={{ color: "#3fae4a" }}>■</span> trống
+            <span
+              style={{
+                width: 60,
+                height: 8,
+                borderRadius: 4,
+                background: "linear-gradient(90deg,#3fae4a,#d8d13a,#d84a3a)",
+              }}
+            />
+            <span style={{ color: "#d84a3a" }}>■</span> có hàng
+          </span>
+        )}
+        {status && !heatmap && (
           <span style={{ color: "#9fb0d8", fontSize: 13 }}>{status}</span>
         )}
       </form>
@@ -98,6 +151,7 @@ export default function WarehouseView({
         locations={locations}
         placements={placements}
         highlightedBinIds={highlighted}
+        heatmap={heatmap}
       />
     </>
   );

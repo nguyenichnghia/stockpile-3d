@@ -12,6 +12,47 @@ function binCode(l: Location): string {
   return [l.zone, l.aisle, l.rack, l.level, l.bin].join("-");
 }
 
+/** Green (cool, value 0) → red (hot, value 1) via yellow. */
+function heatColor(value: number): THREE.Color {
+  const v = Math.max(0, Math.min(1, value));
+  // hue 120° (green) down to 0° (red); THREE hue is 0..1.
+  return new THREE.Color().setHSL((1 - v) * (120 / 360), 0.75, 0.5);
+}
+
+/** Bins colored per-instance by a heatmap value (setColorAt). */
+function HeatmapBins({
+  matrices,
+  colors,
+}: {
+  matrices: THREE.Matrix4[];
+  colors: THREE.Color[];
+}) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+
+  useLayoutEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    matrices.forEach((m, i) => {
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, colors[i]);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [matrices, colors]);
+
+  return (
+    <instancedMesh
+      key={matrices.length}
+      ref={ref}
+      args={[undefined, undefined, Math.max(matrices.length, 1)]}
+      frustumCulled
+    >
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial transparent opacity={0.55} />
+    </instancedMesh>
+  );
+}
+
 // Warehouse coords: x = width, y = depth, z = height.
 // Three.js is Y-up, so we map warehouse z -> three Y and warehouse y -> three Z.
 function centerMatrix(
@@ -75,15 +116,27 @@ export default function Warehouse3D({
   locations,
   placements,
   highlightedBinIds,
+  heatmap,
 }: {
   locations: Location[];
   placements: Placement[];
   /** Bins to keep bright; when non-empty, all other lots are dimmed. */
   highlightedBinIds?: Set<number>;
+  /** When set, color every bin by its value in [0,1] instead of drawing lots. */
+  heatmap?: Map<number, number>;
 }) {
   const binMatrices = useMemo(
     () => locations.map((l) => centerMatrix(l.x, l.y, l.z, l.w, l.d, l.h)),
     [locations],
+  );
+
+  const heatmapOn = !!heatmap;
+  const heatColors = useMemo(
+    () =>
+      heatmap
+        ? locations.map((l) => heatColor(heatmap.get(l.id) ?? 0))
+        : [],
+    [locations, heatmap],
   );
 
   // A lot is drawn slightly smaller than its bin so it reads as "inside".
@@ -148,16 +201,23 @@ export default function Warehouse3D({
       <directionalLight position={[10, 20, 10]} intensity={1.2} />
       <Grid args={[100, 100]} cellColor="#1e2a4a" sectionColor="#33406b" infiniteGrid fadeDistance={120} />
 
-      {/* Bins: translucent frames showing the slot grid. */}
-      <Instances matrices={binMatrices} color="#5b6cff" opacity={0.18} wireframe />
-      {/* Matched lots (or all lots when not searching): solid, bright. */}
-      <Instances matrices={matchedMatrices} color="#ffb347" />
-      {/* Unmatched lots during a search: dimmed so results stand out. */}
-      <Instances matrices={dimmedMatrices} color="#ffb347" opacity={0.12} />
+      {heatmapOn ? (
+        /* Heatmap mode: color every bin by its metric value; lots are hidden. */
+        <HeatmapBins matrices={binMatrices} colors={heatColors} />
+      ) : (
+        <>
+          {/* Bins: translucent frames showing the slot grid. */}
+          <Instances matrices={binMatrices} color="#5b6cff" opacity={0.18} wireframe />
+          {/* Matched lots (or all lots when not searching): solid, bright. */}
+          <Instances matrices={matchedMatrices} color="#ffb347" />
+          {/* Unmatched lots during a search: dimmed so results stand out. */}
+          <Instances matrices={dimmedMatrices} color="#ffb347" opacity={0.12} />
+        </>
+      )}
 
-      {/* Bin-code labels above matched lots (only while searching). Fixed small
-          size (no distanceFactor so they don't balloon up close). */}
-      {labels.map((l) => (
+      {/* Bin-code labels above matched lots (only while searching, not in heatmap).
+          Fixed small size (no distanceFactor so they don't balloon up close). */}
+      {!heatmapOn && labels.map((l) => (
         <Html key={l.key} position={l.pos} center zIndexRange={[10, 0]}>
           <div
             style={{
