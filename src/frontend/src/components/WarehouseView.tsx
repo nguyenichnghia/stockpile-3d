@@ -27,17 +27,15 @@ export default function WarehouseView({
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [heatmap, setHeatmap] = useState<Map<number, number> | undefined>();
+  const [metric, setMetric] = useState<HeatmapMetric>("fill");
 
-  async function toggleHeatmap() {
-    if (heatmap) {
-      setHeatmap(undefined);
-      return;
-    }
+  async function loadHeatmap(m: HeatmapMetric) {
     // Heatmap and SKU search are separate modes; clear the search first.
     clear();
+    setMetric(m);
     setBusy(true);
     try {
-      const result = await fetchHeatmap("fill");
+      const result = await fetchHeatmap(m);
       setHeatmap(new Map(result.cells.map((c) => [c.binId, c.value])));
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Lỗi tải heatmap");
@@ -117,9 +115,29 @@ export default function WarehouseView({
             )}
           </>
         )}
-        <button type="button" onClick={toggleHeatmap} disabled={busy} style={btnStyle}>
-          {heatmap ? "Tắt heatmap" : "Heatmap mức đầy"}
-        </button>
+        {heatmap ? (
+          <button type="button" onClick={() => setHeatmap(undefined)} style={btnStyle}>
+            Tắt heatmap
+          </button>
+        ) : (
+          <select
+            value=""
+            disabled={busy}
+            onChange={(e) => e.target.value && loadHeatmap(e.target.value as HeatmapMetric)}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #33406b",
+              background: "#0f1630",
+              color: "#e6ecff",
+              fontSize: 13,
+            }}
+          >
+            <option value="">{busy ? "…" : "Heatmap…"}</option>
+            <option value="fill">Mức đầy</option>
+            <option value="blocking">Độ bị chặn</option>
+          </select>
+        )}
         {heatmap && (
           <span
             style={{
@@ -130,7 +148,7 @@ export default function WarehouseView({
               fontSize: 12,
             }}
           >
-            <span style={{ color: "#3fae4a" }}>■</span> trống
+            <span style={{ color: "#3fae4a" }}>■</span> {LEGEND[metric].low}
             <span
               style={{
                 width: 60,
@@ -139,7 +157,7 @@ export default function WarehouseView({
                 background: "linear-gradient(90deg,#3fae4a,#d8d13a,#d84a3a)",
               }}
             />
-            <span style={{ color: "#d84a3a" }}>■</span> có hàng
+            <span style={{ color: "#d84a3a" }}>■</span> {LEGEND[metric].high}
           </span>
         )}
         {status && !heatmap && (
@@ -156,6 +174,14 @@ export default function WarehouseView({
     </>
   );
 }
+
+type HeatmapMetric = "fill" | "blocking";
+
+/** Legend labels for each metric's cool (green) and hot (red) ends. */
+const LEGEND: Record<HeatmapMetric, { low: string; high: string }> = {
+  fill: { low: "trống", high: "có hàng" },
+  blocking: { low: "dễ lấy", high: "bị chặn" },
+};
 
 const btnStyle: React.CSSProperties = {
   padding: "6px 12px",
