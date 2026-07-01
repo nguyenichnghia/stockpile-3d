@@ -26,14 +26,15 @@
 | 7 | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Bất cứ lúc nào gặp từ chưa rõ |
 | 8 | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu map vào dự án | Khi muốn học thêm để hiểu sâu |
 | 9 | [Đề xuất thiết kế hệ thống](./system-design-proposal.md) | Công nghệ + mẫu thiết kế giúp mạnh/scale/tin cậy hơn (CQRS, Redis, optimistic lock, Kafka, Hexagonal...) — kèm ưu tiên Now/Next/Later | Khi nghĩ về nâng cấp / scale / production |
-| 10 | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Xem các bug đã gặp & cách xử lý |
+| 10 | [Thiết lập kho](./warehouse-setup.md) | Các cách tạo dữ liệu vị trí (generator theo lưới / import CSV-Excel / editor 3D) — kèm trade-off + ưu tiên Now/Next/Later | Khi cần dựng dữ liệu kho để chạy/thử |
+| 11 | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Xem các bug đã gặp & cách xử lý |
 
 ### C. Quy trình phát triển (đọc khi bắt tay code/đóng góp)
 
 | # | Tài liệu | Nội dung | Khi nào đọc |
 |---|---|---|---|
-| 11 | [Git Workflow](./02-git-workflow.md) *(file `02`)* | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
-| 12 | [Quy trình tài liệu hóa](./03-documentation.md) *(file `03`)* | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
+| 12 | [Git Workflow](./02-git-workflow.md) *(file `02`)* | Branching, Conventional Commits, cấu trúc repo, README checklist | Trước khi commit dòng code đầu tiên |
+| 13 | [Quy trình tài liệu hóa](./03-documentation.md) *(file `03`)* | Chuẩn ADR (Nygard), Keep a Changelog, Dev Log, Algorithm Spec | Khi cần ghi lại quyết định/thay đổi |
 
 > **Kế hoạch & tiến độ:** [commit-plan.md](./commit-plan.md) (task theo giai đoạn) · [CHANGELOG](../CHANGELOG.md) (đã làm gì). **Quyết định lớn:** [adr/](./adr/).
 
