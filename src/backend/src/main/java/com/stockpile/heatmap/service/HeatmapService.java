@@ -1,5 +1,7 @@
 package com.stockpile.heatmap.service;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +26,8 @@ import lombok.RequiredArgsConstructor;
  * Warehouse heatmap: assigns every bin a value in [0, 1] for one metric, so the
  * 3D scene can color the whole warehouse on a green→red gradient. Read-only.
  *
- * <p>Supports {@code fill} (occupancy) and {@code blocking} (how buried a lot
- * is). The switch leaves room to add {@code expiry} later without changing the
- * endpoint contract.
+ * <p>Supports {@code fill} (occupancy), {@code blocking} (how buried a lot is)
+ * and {@code expiry} (how close a lot is to its use-by date).
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +39,12 @@ public class HeatmapService {
 	 */
 	private static final double BLOCKING_CAP = 3.0;
 
+	/**
+	 * How many days out an expiry starts to matter. A lot expiring in this many
+	 * days or more is 0.0 (green); on its expiry day (or past it) it is 1.0 (red).
+	 */
+	private static final double EXPIRY_HORIZON_DAYS = 30.0;
+
 	private final LocationRepository locationRepository;
 	private final PlacementRepository placementRepository;
 
@@ -47,6 +54,7 @@ public class HeatmapService {
 		return switch (m) {
 			case "fill" -> fill();
 			case "blocking" -> blocking();
+			case "expiry" -> expiry();
 			default -> throw new IllegalArgumentException("Unknown heatmap metric: " + metric);
 		};
 	}
@@ -86,6 +94,35 @@ public class HeatmapService {
 				.map(l -> new Cell(l.getId(), valueByBin.getOrDefault(l.getId(), 0.0)))
 				.toList();
 		return new HeatmapResult("blocking", cells);
+	}
+
+	/**
+	 * How close each lot is to its use-by date, over {@link #EXPIRY_HORIZON_DAYS}.
+	 * Empty bins and lots without an expiry are 0.0 (green); expired lots are 1.0.
+	 */
+	private HeatmapResult expiry() {
+		LocalDate today = LocalDate.now();
+		Map<Long, Double> valueByBin = new HashMap<>();
+		for (Placement p : placementRepository.findAll()) {
+			valueByBin.put(p.getBin().getId(), expiryUrgency(p.getLot().getExpiry(), today));
+		}
+		List<Cell> cells = locationRepository.findAll().stream()
+				.map(l -> new Cell(l.getId(), valueByBin.getOrDefault(l.getId(), 0.0)))
+				.toList();
+		return new HeatmapResult("expiry", cells);
+	}
+
+	/**
+	 * Urgency in [0,1]: 0 when {@code expiry} is null or at least the horizon away,
+	 * 1 on the expiry day or past it, linear in between. Pure, so it is testable.
+	 */
+	static double expiryUrgency(LocalDate expiry, LocalDate today) {
+		if (expiry == null) {
+			return 0.0;
+		}
+		long daysLeft = ChronoUnit.DAYS.between(today, expiry);
+		double urgency = (EXPIRY_HORIZON_DAYS - daysLeft) / EXPIRY_HORIZON_DAYS;
+		return Math.max(0.0, Math.min(1.0, urgency));
 	}
 
 	private static LotBox toBox(Placement p) {

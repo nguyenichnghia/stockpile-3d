@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -100,6 +101,18 @@ class HeatmapServiceTest {
 		assertThat(byBin.get(empty.getId())).isEqualTo(0.0);
 	}
 
+	@Test
+	void expiryIsHotForSoonExpiringAndZeroForEmpty() {
+		Location expiring = binAt("lane-x", 0, 0, 0);
+		Location empty = binAt("lane-y", 5, 5, 0);
+		putawayExpiring(expiring, LocalDate.now()); // expires today -> fully hot
+
+		Map<Long, Double> byBin = values(heatmapService.compute("expiry"));
+
+		assertThat(byBin.get(expiring.getId())).isEqualTo(1.0);
+		assertThat(byBin.get(empty.getId())).isEqualTo(0.0);
+	}
+
 	private static Map<Long, Double> values(HeatmapResult r) {
 		return r.cells().stream().collect(Collectors.toMap(Cell::binId, Cell::value));
 	}
@@ -131,6 +144,10 @@ class HeatmapServiceTest {
 	}
 
 	private void putaway(Location bin) {
+		putawayExpiring(bin, null);
+	}
+
+	private void putawayExpiring(Location bin, LocalDate expiry) {
 		Sku sku = new Sku();
 		sku.setCode("S-" + System.nanoTime());
 		sku.setName("t");
@@ -147,6 +164,7 @@ class HeatmapServiceTest {
 		lot.setD(BigDecimal.ONE);
 		lot.setH(BigDecimal.ONE);
 		lot.setWeight(BigDecimal.ONE);
+		lot.setExpiry(expiry);
 		lot = lotRepository.save(lot);
 
 		Movement m = new Movement();
