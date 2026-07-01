@@ -58,6 +58,19 @@ export type LocateResult = {
 export const locateBySku = (sku: string) =>
   getJson<LocateResult>(`/api/lots/locate?sku=${encodeURIComponent(sku)}`);
 
+export type BinLocateResult = {
+  code: string;
+  found: boolean;
+  binId: number | null;
+  x: number | null;
+  y: number | null;
+  z: number | null;
+};
+
+/** Locate a single bin by its full code (zone-aisle-rack-level-bin). */
+export const locateBin = (code: string) =>
+  getJson<BinLocateResult>(`/api/locations/locate?code=${encodeURIComponent(code)}`);
+
 export type HeatmapCell = { binId: number; value: number };
 
 export type HeatmapResult = {

@@ -1,6 +1,7 @@
 package com.stockpile.inventory.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -9,6 +10,10 @@ import org.springframework.data.repository.query.Param;
 import com.stockpile.inventory.domain.Location;
 
 public interface LocationRepository extends JpaRepository<Location, Long> {
+
+	/** The bin identified by its full code parts (zone-aisle-rack-level-bin). */
+	Optional<Location> findByZoneAndAisleAndRackAndLevelAndBin(
+			String zone, String aisle, String rack, String level, String bin);
 
 	/** Locations in a lane that currently hold no lot (candidate temp slots). */
 	@Query("""
