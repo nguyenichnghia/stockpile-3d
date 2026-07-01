@@ -2,18 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Current state: documentation-only, pre-code
+## Current state: MVP + algorithm core built (tags v0.1.0, v0.2.0)
 
-This repository currently contains **only planning documents** (numbered `00`–`03`, written in Vietnamese). There is no source code, no `package.json`, no build system, no tests, and no git repository yet. Do not assume the directory structure described in the docs exists — it is the *target* layout, not the current one.
+This is **no longer documentation-only** — a working backend and frontend exist. Both cores (inventory CRUD + the two engines) are implemented and tested. Do not run `git init`, recreate the folder structure, or treat the layout as merely a *target* — it exists.
 
-The docs are the single source of truth for product direction, architecture, and process. Read them before writing any code:
+What is **built**:
 
-- [docs/00-index.md](docs/00-index.md) — table of contents; defines the canonical repo structure (do not redefine it elsewhere).
+- **Backend** (`src/backend/`, Java + Spring Boot): the five domain entities (`Location`, `Sku`, `Lot`, `Placement`, `Movement`), inventory CRUD controllers, the append-only movement ledger with the `placement` projection (`PlacementProjectionService`, incremental + `rebuildAll` replay), the **CRP relocation engine** (`RelocationService` + pure `BlockingGraph`), and the **SLAP putaway engine** (`PutawayService`). Flyway migration `V1__core_schema.sql`. Tests use Testcontainers (real Postgres) — so `mvnw test` needs Docker running; only the pure `BlockingGraphTest` runs without it.
+- **Frontend** (`src/frontend/`, Next.js + React Three Fiber): a read-only 3D viewer (`Warehouse3D.tsx`) that fetches `/api/locations` + `/api/placements` and renders bins/lots as `InstancedMesh`. It only visualizes; it never mutates state.
+- **Infra:** `docker-compose.yml`, Dockerfiles for both, `CHANGELOG.md`, four ADRs.
+
+What is **not built yet** (empty `.gitkeep` packages): the **picking** engine and the **realtime** layer — the Spring WebSocket delta-push to the scene (promised in ADR-0002) does **not** exist; the frontend fetches once and does not live-update.
+
+The docs remain the single source of truth for product direction and process. Read them before non-trivial work:
+
+- [docs/00-index.md](docs/00-index.md) — table of contents + canonical repo structure (do not redefine it elsewhere).
 - [docs/01-overview.md](docs/01-overview.md) — problem, data model, NFRs, architecture, algorithm formulations + Big-O, roadmap. Read for *what* and *why*.
+- [docs/warehouse-setup.md](docs/warehouse-setup.md) — how to create `location` data (grid generator / CSV import / editor); note there is **no bulk warehouse-setup tooling yet** — only per-bin CRUD.
 - [docs/02-git-workflow.md](docs/02-git-workflow.md) — branching, Conventional Commits, repo structure, README checklist.
 - [docs/03-documentation.md](docs/03-documentation.md) — ADR (Nygard) format, Keep a Changelog, Dev Log, Algorithm Spec conventions.
-
-When the project moves from planning to code, the first tasks (per `docs/00-index.md` §"Việc tiếp theo") are: init the git repo + `.gitignore` + the target folder structure, create a Postgres database named `stockpile_3d`, write `README.md`, then build the Phase 1 MVP on a `feature/` branch.
 
 ## What this project is
 
@@ -29,24 +36,24 @@ Target scale: medium warehouses, 10k–50k locations, ~5k–20k active lots. Pos
 ### Architectural invariants (do not violate without an ADR)
 
 - **Movement ledger is append-only and is the source of truth.** Every physical change (inbound, putaway, relocate, pick, outbound) is a ledger entry. The `placement` table (current state of each lot) is a **projection** rebuilt from the ledger. When data conflicts, the ledger wins.
-- **The "blocking" relationship is the heart of the system.** Lot B blocks A if freeing A requires moving B first (on-top: `B.z_min ≥ A.z_max` with overlapping `(x,y)` projection; in-front: same lane, B nearer the `access_face` covering A's exit path). These relationships form a directed blocking graph (a DAG when stacking is valid). Note the documented edge case: use `>` not `≥` when distinguishing "same level" from "above" (see Dev Log in `03`, dated 2026-06-25).
+- **The "blocking" relationship is the heart of the system.** Lot B blocks A if freeing A requires moving B first (on-top: `B.z_min >= A.z_max` with overlapping `(x,y)` footprint — flush stacking counts; in-front: same lane, B nearer the `access_face` covering A's exit path). These relationships form a directed blocking graph (a DAG when stacking is valid). Edge case (see `BlockingGraph.java` javadoc + Dev Log `03`, 2026-06-25): two lots at the *same level* must NOT block — the on-top `z` test uses `>=` but the `(x,y)`-footprint `overlaps()` check (strict `<`, touching edges don't overlap) is what separates "stacked" from "side by side". Do not "fix" the `>=` to `>` without re-reading that reasoning.
 - **Blocking is local to a lane/stack.** Decided against PostGIS / global 3D spatial index for v1 — partition by `(zone, aisle, rack)` and reason within the lane (a few dozen lots). Reconsider only for multi-warehouse.
 - **3D never makes decisions.** Users do not drag-and-drop lots; the engine proposes, the 3D layer presents and the user confirms.
 
-### Intended stack (from the docs)
+### Stack
 
-Frontend: Next.js + React Three Fiber, using `InstancedMesh` + frustum culling to hit ~60 fps at ~50k instances. Backend: **Java + Spring Boot** — Spring Web (REST commands/queries) + Spring WebSocket (delta push to the scene), Spring Data JPA/Hibernate for ORM with native queries for the heavy blocking lookups, Flyway for schema migrations (see [docs/adr/0002-backend-spring-boot.md](docs/adr/0002-backend-spring-boot.md)). Data: PostgreSQL (Supabase), database `stockpile_3d`. Target structure splits `src/` into `backend/`, `frontend/`, and `shared/`. Note: because backend is Java and frontend is TypeScript, `src/shared` no longer holds shared TS types — generate a TS client from the backend's OpenAPI spec instead (per ADR-0002).
+Frontend: Next.js + React Three Fiber, using `InstancedMesh` + frustum culling to hit ~60 fps at ~50k instances (in place). Backend: **Java + Spring Boot** — Spring Web (REST commands/queries) in place; **Spring WebSocket delta push to the scene is planned, not yet built**. Spring Data JPA/Hibernate for ORM (native queries reserved for heavy blocking lookups), Flyway for schema migrations (see [docs/adr/0002-backend-spring-boot.md](docs/adr/0002-backend-spring-boot.md)). Data: PostgreSQL (Supabase), database `stockpile_3d`. `src/` splits into `backend/` and `frontend/`. Note: because backend is Java and frontend is TypeScript, there is no shared-TS-types folder — generate a TS client from the backend's OpenAPI spec instead (per ADR-0002).
 
 ## Conventions to follow
 
-These come from `02` and `03` and apply the moment code exists:
+These come from `02` and `03` and are already in force (code exists):
 
 - **Git:** `main` stays buildable. One branch per feature/fix (`feature/xxx`, `fix/xxx`), merged via PR. **Conventional Commits** (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`) with lowercase, imperative descriptions. Small, single-purpose commits.
 - **Workflow tooling:** full git workflow in [docs/02-git-workflow.md](docs/02-git-workflow.md); finalize a feature with the `/ship` command; phased commit plan in [docs/commit-plan.md](docs/commit-plan.md).
 - **ADRs are immutable once `Accepted`.** To change a decision, write a new ADR that supersedes the old one — never edit an accepted ADR. Five sections (Nygard): Title · Status · Context · Decision · Consequences (state trade-offs, don't hide them). Numbered sequentially in `docs/adr/`. The greedy-CRP decision is ADR-0001 (template in `03` §3).
 - **CHANGELOG** follows Keep a Changelog + SemVer; keep an `[Unreleased]` section and tag releases (`v0.1.0` = MVP, etc.).
 - **Dev Log** captures real problems + root cause + fix at end of a session when something noteworthy happened.
-- **Algorithm Spec** (`docs/algorithm-spec.md`) gets written when the algorithm module is done — problem, why it's hard (with academic citation), pseudocode, Big-O, trade-offs, concrete test cases.
+- **Algorithm Spec** (`docs/algorithm-spec.md`) documents a finished algorithm module — problem, why it's hard (with academic citation), pseudocode, Big-O, trade-offs, concrete test cases. CRP + SLAP are already written up there; extend it when adding a new engine.
 
 ## Language note
 
@@ -58,7 +65,7 @@ Ask before coding when a request is ambiguous **and the ambiguity is
 consequential** — it affects business rules, the data model/schema,
 architecture, or anything hard to reverse. In those cases, do not guess.
 
-- Read the relevant docs (`docs/01`–`03`) and existing code first, then ask
+- Read the relevant docs (`docs/01`–`03`) and the existing code (`src/backend`, `src/frontend`) first, then ask
   **one focused question** via the **AskUserQuestion** tool: 2–4 concrete
   options, state the trade-off of each, mark a recommended one. Plan Mode is
   the natural place for this.
