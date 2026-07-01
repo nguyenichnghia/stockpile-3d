@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, GizmoHelper, GizmoViewport, Grid } from "@react-three/drei";
 import * as THREE from "three";
@@ -69,9 +69,12 @@ function Instances({
 export default function Warehouse3D({
   locations,
   placements,
+  highlightedBinIds,
 }: {
   locations: Location[];
   placements: Placement[];
+  /** Bins to keep bright; when non-empty, all other lots are dimmed. */
+  highlightedBinIds?: Set<number>;
 }) {
   const binMatrices = useMemo(
     () => locations.map((l) => centerMatrix(l.x, l.y, l.z, l.w, l.d, l.h)),
@@ -83,17 +86,35 @@ export default function Warehouse3D({
     () => new Map(locations.map((l) => [l.id, l])),
     [locations],
   );
-  const lotMatrices = useMemo(
+  const lotMatrix = useCallback(
+    (p: Placement): THREE.Matrix4 => {
+      const bin = byId.get(p.binId);
+      const s = 0.8;
+      const w = bin ? bin.w * s : 0.8;
+      const d = bin ? bin.d * s : 0.8;
+      const h = bin ? bin.h * s : 0.8;
+      return centerMatrix(p.x, p.y, p.z, w, d, h);
+    },
+    [byId],
+  );
+
+  // With no active search, every lot is drawn normally. With a search, split
+  // lots into matched (bright) and unmatched (dimmed) so the results stand out.
+  const searching = !!highlightedBinIds && highlightedBinIds.size > 0;
+  const matchedMatrices = useMemo(
     () =>
-      placements.map((p) => {
-        const bin = byId.get(p.binId);
-        const s = 0.8;
-        const w = bin ? bin.w * s : 0.8;
-        const d = bin ? bin.d * s : 0.8;
-        const h = bin ? bin.h * s : 0.8;
-        return centerMatrix(p.x, p.y, p.z, w, d, h);
-      }),
-    [placements, byId],
+      (searching
+        ? placements.filter((p) => highlightedBinIds!.has(p.binId))
+        : placements
+      ).map(lotMatrix),
+    [placements, highlightedBinIds, searching, lotMatrix],
+  );
+  const dimmedMatrices = useMemo(
+    () =>
+      searching
+        ? placements.filter((p) => !highlightedBinIds!.has(p.binId)).map(lotMatrix)
+        : [],
+    [placements, highlightedBinIds, searching, lotMatrix],
   );
 
   return (
@@ -104,8 +125,10 @@ export default function Warehouse3D({
 
       {/* Bins: translucent frames showing the slot grid. */}
       <Instances matrices={binMatrices} color="#5b6cff" opacity={0.18} wireframe />
-      {/* Lots: solid boxes for what is physically placed. */}
-      <Instances matrices={lotMatrices} color="#ffb347" />
+      {/* Matched lots (or all lots when not searching): solid, bright. */}
+      <Instances matrices={matchedMatrices} color="#ffb347" />
+      {/* Unmatched lots during a search: dimmed so results stand out. */}
+      <Instances matrices={dimmedMatrices} color="#ffb347" opacity={0.12} />
 
       <OrbitControls makeDefault />
       <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
