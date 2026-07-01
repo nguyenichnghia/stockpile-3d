@@ -7,7 +7,8 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
-Giai đoạn 3 (đang làm) — Thiết lập kho + Tra cứu trực quan + Heatmap "sức khỏe kho".
+## [0.3.0] - 2026-07-01
+Giai đoạn 3 — Thiết lập kho + Tra cứu trực quan + Heatmap "sức khỏe kho".
 
 ### Added
 - **Bộ sinh kho theo lưới (Grid Generator)** — `POST /api/warehouse/generate` nhận tham số lưới (zones/aisles/racks/levels/bins + kích thước bin + aisleGap + accessFace) và sinh hàng loạt `location` với tọa độ tính sẵn (bin theo x, level chồng theo z, aisle tách theo y), ghi trong một transaction. Chặn khi kho đã có dữ liệu. Chỉ tạo `location`, không đụng ledger. Package `com.stockpile.setup`. Tài liệu: `docs/warehouse-setup.md`.
