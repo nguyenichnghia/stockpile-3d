@@ -38,7 +38,7 @@ Nguyên tắc dữ liệu: mọi thay đổi vật lý ghi vào **movement ledge
 | Lớp | Công nghệ | Vì sao |
 |---|---|---|
 | Frontend | Next.js + React Three Fiber (Three.js) | `InstancedMesh` + frustum culling đạt ~60 fps tới ~50k instance — render được kho lớn mà không viết lại WebGL thủ công |
-| Backend | **Java + Spring Boot** (Web, Data JPA, WebSocket, Flyway) | Hệ sinh thái trưởng thành; JPA cho CRUD + **native query** cho truy vấn blocking nặng; chốt trong [ADR-0002](docs/adr/0002-backend-spring-boot.md) |
+| Backend | **Java + Spring Boot** (Web, Data JPA, Flyway; WebSocket *dự kiến*) | Hệ sinh thái trưởng thành; JPA cho CRUD + **native query** cho truy vấn blocking nặng; chốt trong [ADR-0002](docs/adr/0002-backend-spring-boot.md) |
 | Data | PostgreSQL | Ledger append-only + projection; blocking suy luận **cục bộ theo lane**, không cần PostGIS ở v1 |
 | API docs | springdoc-openapi | Sinh OpenAPI → tạo client TS cho frontend (BE Java, FE TS không dùng chung type) |
 
@@ -90,12 +90,37 @@ npm run dev          # http://localhost:3000
 
 > Backend đọc toàn bộ secret từ biến môi trường — **không hardcode** trong mã. Xem thêm [src/backend/README.md](src/backend/README.md).
 
+> ⚠️ **Xung đột cổng 5432:** nếu máy đã có sẵn một Postgres khác (ví dụ service `postgresql-x64` cài trên Windows) chiếm cổng 5432, backend sẽ nối nhầm vào đó và báo `password authentication failed` dù mật khẩu đúng. Cách xử lý: chạy Postgres của Docker ở cổng khác, ví dụ `docker run -d --name pg -e POSTGRES_DB=stockpile_3d -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5433:5432 postgres:18-alpine`, rồi trỏ backend vào `localhost:5433`. Chi tiết: [Dev Log 2026-07-01](docs/dev-log.md).
+
+### Tạo dữ liệu mẫu để xem tính năng
+
+Kho mới trống. Sinh nhanh một lưới rồi đặt vài lô (backend ở cổng 8080):
+```bash
+# sinh 1 cột 3 tầng (3 ô xếp chồng — để xem heatmap "độ bị chặn")
+curl -X POST localhost:8080/api/warehouse/generate -H 'Content-Type: application/json' \
+  -d '{"zones":1,"aislesPerZone":1,"racksPerAisle":1,"levelsPerRack":3,"binsPerLevel":1,"binWidth":1.2,"binDepth":1,"binHeight":1.5,"aisleGap":2,"accessFace":"SOUTH"}'
+# tạo SKU rồi putaway lô vào các ô (xem docs/warehouse-setup.md để biết thêm)
+```
+Sau đó mở http://localhost:3000 và thử ô "Tra mã hàng", "Tra mã ô", dropdown "Heatmap…".
+
 ## Điểm kỹ thuật nổi bật
 
 - **CRP — Container/Block Relocation Problem** (Relocation Engine): cho lô mục tiêu cần rút, tính chuỗi di chuyển **tối thiểu** để giải phóng nó. Bài toán **NP-hard**; v1 dùng **heuristic greedy** trên đồ thị blocking cục bộ theo lane (mục tiêu < 500 ms cho lane ≤ 100 lô). Output là danh sách bước → animation 3D.
 - **SLAP — Storage Location Assignment Problem** (Putaway Engine): chấm điểm các vị trí trống và chọn vị trí chi phí thấp nhất (`O(F·k)`), có thể giải thích cho người vận hành.
 
 Đặc tả đầy đủ (pseudocode, Big-O, test case): [docs/algorithm-spec.md](docs/algorithm-spec.md). Tổng quan: [docs/01-overview.md](docs/01-overview.md) §8.
+
+## Tính năng đã có
+
+| Nhóm | Tính năng | API |
+|---|---|---|
+| Tồn kho | CRUD `sku`/`location`/`lot`, ghi ledger, projection placement | `/api/skus` · `/api/locations` · `/api/lots` · `/api/movements` · `/api/placements` |
+| Engine | Relocation (CRP) · Putaway (SLAP) — chỉ đề xuất, không ghi ledger | `/api/relocation-plan` · `/api/putaway-suggestion` |
+| Thiết lập kho | Sinh kho theo lưới (tạo hàng loạt `location`) | `POST /api/warehouse/generate` |
+| Tra cứu trực quan | Tra mã hàng (SKU) → highlight + làm mờ + nhãn ô · Tra mã ô → tô sáng khung ô (kể cả trống) | `GET /api/lots/locate?sku=` · `GET /api/locations/locate?code=` |
+| Heatmap | Tô màu cả kho theo mức đầy / độ bị chặn / sắp hết hạn | `GET /api/heatmap?metric={fill\|blocking\|expiry}` |
+
+Cách dùng trên 3D: ô nhập "Tra mã hàng" / "Tra mã ô" và dropdown "Heatmap…" ở góc trên trái màn hình.
 
 ## Tài liệu
 
@@ -106,4 +131,4 @@ npm run dev          # http://localhost:3000
 
 ## Trạng thái
 
-Đang ở giai đoạn **khung dự án** (chạy được, chưa có logic nghiệp vụ). Lộ trình & kế hoạch commit: [docs/commit-plan.md](docs/commit-plan.md).
+Đã có **backend + frontend chạy được** với hai engine lõi và lớp tra cứu trực quan (tag `v0.1.0` MVP, `v0.2.0` lõi thuật toán; Giai đoạn 3 đang hoàn thiện). **Chưa làm:** engine picking và lớp realtime (WebSocket đẩy delta) — hiện frontend fetch một lần, không tự cập nhật. Lộ trình & tiến độ: [CHANGELOG](CHANGELOG.md) · [docs/commit-plan.md](docs/commit-plan.md).
