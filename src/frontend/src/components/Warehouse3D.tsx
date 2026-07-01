@@ -2,10 +2,15 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, GizmoHelper, GizmoViewport, Grid } from "@react-three/drei";
+import { OrbitControls, GizmoHelper, GizmoViewport, Grid, Html } from "@react-three/drei";
 import * as THREE from "three";
 
 import type { Location, Placement } from "@/lib/api";
+
+/** Human-readable bin code, e.g. "A-01-00-1-01". */
+function binCode(l: Location): string {
+  return [l.zone, l.aisle, l.rack, l.level, l.bin].join("-");
+}
 
 // Warehouse coords: x = width, y = depth, z = height.
 // Three.js is Y-up, so we map warehouse z -> three Y and warehouse y -> three Z.
@@ -117,6 +122,26 @@ export default function Warehouse3D({
     [placements, highlightedBinIds, searching, lotMatrix],
   );
 
+  // Labels only for matched lots (few of them), floating above each box, so the
+  // user can read which bin a result sits in. Cheap: no labels when not searching.
+  const labels = useMemo(() => {
+    if (!searching) return [];
+    return placements
+      .filter((p) => highlightedBinIds!.has(p.binId))
+      .map((p) => {
+        const bin = byId.get(p.binId);
+        if (!bin) return null;
+        // Three.js position: warehouse (x,y,z) -> (x, z, y); float above the top.
+        const pos: [number, number, number] = [
+          p.x + bin.w / 2,
+          p.z + bin.h + 0.4,
+          p.y + bin.d / 2,
+        ];
+        return { key: p.binId, pos, text: binCode(bin) };
+      })
+      .filter((l): l is { key: number; pos: [number, number, number]; text: string } => l !== null);
+  }, [placements, highlightedBinIds, searching, byId]);
+
   return (
     <Canvas camera={{ position: [20, 20, 20], fov: 50 }} style={{ background: "#0b1020" }}>
       <ambientLight intensity={0.6} />
@@ -129,6 +154,29 @@ export default function Warehouse3D({
       <Instances matrices={matchedMatrices} color="#ffb347" />
       {/* Unmatched lots during a search: dimmed so results stand out. */}
       <Instances matrices={dimmedMatrices} color="#ffb347" opacity={0.12} />
+
+      {/* Bin-code labels above matched lots (only while searching). Fixed small
+          size (no distanceFactor so they don't balloon up close). */}
+      {labels.map((l) => (
+        <Html key={l.key} position={l.pos} center zIndexRange={[10, 0]}>
+          <div
+            style={{
+              padding: "1px 4px",
+              borderRadius: 3,
+              background: "rgba(11,16,32,0.7)",
+              color: "#ffd9a0",
+              border: "1px solid rgba(255,179,71,0.7)",
+              fontFamily: "system-ui, sans-serif",
+              fontSize: 9,
+              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+            }}
+          >
+            {l.text}
+          </div>
+        </Html>
+      ))}
 
       <OrbitControls makeDefault />
       <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
