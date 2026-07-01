@@ -7,6 +7,18 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+Giai đoạn 3 (đang làm) — Thiết lập kho + Tra cứu trực quan + Heatmap "sức khỏe kho".
+
+### Added
+- **Bộ sinh kho theo lưới (Grid Generator)** — `POST /api/warehouse/generate` nhận tham số lưới (zones/aisles/racks/levels/bins + kích thước bin + aisleGap + accessFace) và sinh hàng loạt `location` với tọa độ tính sẵn (bin theo x, level chồng theo z, aisle tách theo y), ghi trong một transaction. Chặn khi kho đã có dữ liệu. Chỉ tạo `location`, không đụng ledger. Package `com.stockpile.setup`. Tài liệu: `docs/warehouse-setup.md`.
+- **Tra cứu/định vị mã hàng (SKU)** — `GET /api/lots/locate?sku={code}` trả mọi placement của lô thuộc SKU (case-insensitive). 3D làm nổi bật các lô khớp, làm mờ phần còn lại, kèm nhãn mã ô nổi trên lô khớp.
+- **Tra cứu theo mã ô (bin)** — `GET /api/locations/locate?code={zone-aisle-rack-level-bin}` trả ô theo mã (kể cả ô trống, `found=false` nếu không có). 3D tô sáng khung ô + nhãn, dù ô trống.
+- **Heatmap toàn kho** — `GET /api/heatmap?metric={fill|blocking|expiry}` trả giá trị [0,1] cho mỗi ô; 3D tô màu cả kho theo thang xanh→đỏ, kèm chú thích. `fill` = mức đầy (nhị phân), `blocking` = độ bị chặn (tái dùng `BlockingGraph`, chuẩn hóa theo cap=3), `expiry` = độ gấp FEFO theo hạn dùng (horizon 30 ngày). Package `com.stockpile.heatmap`.
+- Test (Testcontainers + unit thuần): `WarehouseGeneratorServiceTest`, `LocateServiceTest`, `HeatmapServiceTest`, `HeatmapExpiryTest`, `PutawayScorerTest`, `RelocationPlannerTest`.
+
+### Changed
+- **Tách logic thuật toán khỏi DB để test không cần Docker:** trích `PutawayScorer` (SLAP scoring thuần) khỏi `PutawayService` và `RelocationPlanner` (heuristic CRP thuần) khỏi `RelocationService` — cùng kiểu tách như `BlockingGraph`. Service giữ I/O, ủy thác phần tính toán. Hành vi không đổi; bổ sung tầng test thuần chạy mili-giây không cần Postgres.
+
 ## [0.2.0] - 2026-06-22
 Giai đoạn 2 — Lõi thuật toán: Relocation Engine (CRP) + Putaway Engine (SLAP).
 
