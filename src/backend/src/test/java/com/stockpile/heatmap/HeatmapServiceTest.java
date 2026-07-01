@@ -76,13 +76,43 @@ class HeatmapServiceTest {
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Test
+	void blockingIsHotForBuriedLotAndZeroForTop() {
+		// Two lots stacked in the same lane: bottom (z=0) is blocked by top (z=2).
+		Location bottom = binAt("lane-stk", 0, 0, 0);
+		Location top = binAt("lane-stk", 0, 0, 2);
+		putaway(bottom);
+		putaway(top);
+
+		Map<Long, Double> byBin = values(heatmapService.compute("blocking"));
+
+		// bottom has 1 blocker -> 1/CAP(3) > 0; top has none -> 0.
+		assertThat(byBin.get(bottom.getId())).isGreaterThan(0.0);
+		assertThat(byBin.get(top.getId())).isEqualTo(0.0);
+	}
+
+	@Test
+	void blockingIsZeroForEmptyBin() {
+		Location empty = binAt("lane-e", 5, 5, 0);
+
+		Map<Long, Double> byBin = values(heatmapService.compute("blocking"));
+
+		assertThat(byBin.get(empty.getId())).isEqualTo(0.0);
+	}
+
 	private static Map<Long, Double> values(HeatmapResult r) {
 		return r.cells().stream().collect(Collectors.toMap(Cell::binId, Cell::value));
 	}
 
 	// --- helpers ---
 
+	/** A bin in its own lane at (x,0,0) — for fill tests where lanes don't matter. */
 	private Location bin(double x) {
+		return binAt("lane-" + System.nanoTime(), x, 0, 0);
+	}
+
+	/** A bin in a given lane at (x,y,z) — for blocking tests that stack lots. */
+	private Location binAt(String lane, double x, double y, double z) {
 		Location l = new Location();
 		l.setZone("Z");
 		l.setAisle("A");
@@ -90,12 +120,12 @@ class HeatmapServiceTest {
 		l.setLevel("1");
 		l.setBin("B-" + System.nanoTime());
 		l.setX(BigDecimal.valueOf(x));
-		l.setY(BigDecimal.ZERO);
-		l.setZ(BigDecimal.ZERO);
+		l.setY(BigDecimal.valueOf(y));
+		l.setZ(BigDecimal.valueOf(z));
 		l.setW(BigDecimal.ONE);
 		l.setD(BigDecimal.ONE);
 		l.setH(BigDecimal.ONE);
-		l.setLaneId("lane-" + System.nanoTime());
+		l.setLaneId(lane);
 		l.setAccessFace(AccessFace.TOP);
 		return locationRepository.save(l);
 	}
