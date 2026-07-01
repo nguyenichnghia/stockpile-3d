@@ -5,6 +5,7 @@ import { useState } from "react";
 import Warehouse3D from "@/components/Warehouse3D";
 import {
   fetchHeatmap,
+  locateBin,
   locateBySku,
   type Location,
   type Placement,
@@ -28,6 +29,31 @@ export default function WarehouseView({
   const [busy, setBusy] = useState(false);
   const [heatmap, setHeatmap] = useState<Map<number, number> | undefined>();
   const [metric, setMetric] = useState<HeatmapMetric>("fill");
+  const [binQuery, setBinQuery] = useState("");
+  const [locatedBinId, setLocatedBinId] = useState<number | null>(null);
+
+  async function searchBin(e: React.SyntheticEvent) {
+    e.preventDefault();
+    const code = binQuery.trim();
+    if (!code) {
+      setLocatedBinId(null);
+      setStatus(null);
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await locateBin(code);
+      setLocatedBinId(result.found ? result.binId : null);
+      setStatus(
+        result.found ? `Ô ${result.code}` : `Không tìm thấy ô "${code}"`,
+      );
+    } catch (err) {
+      setLocatedBinId(null);
+      setStatus(err instanceof Error ? err.message : "Lỗi tra ô");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function loadHeatmap(m: HeatmapMetric) {
     // Heatmap and SKU search are separate modes; clear the search first.
@@ -72,6 +98,8 @@ export default function WarehouseView({
   function clear() {
     setQuery("");
     setHighlighted(undefined);
+    setBinQuery("");
+    setLocatedBinId(null);
     setStatus(null);
   }
 
@@ -108,7 +136,24 @@ export default function WarehouseView({
             <button type="submit" disabled={busy} style={btnStyle}>
               {busy ? "…" : "Tìm"}
             </button>
-            {highlighted && (
+            <input
+              value={binQuery}
+              onChange={(e) => setBinQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchBin(e)}
+              placeholder="Tra mã ô (A-01-00-1-01)…"
+              style={{
+                padding: "6px 10px",
+                borderRadius: 6,
+                border: "1px solid #33406b",
+                background: "#0f1630",
+                color: "#e6ecff",
+                fontSize: 13,
+              }}
+            />
+            <button type="button" onClick={searchBin} disabled={busy} style={btnStyle}>
+              Tra ô
+            </button>
+            {(highlighted || locatedBinId != null) && (
               <button type="button" onClick={clear} style={btnStyle}>
                 Xóa
               </button>
@@ -170,6 +215,7 @@ export default function WarehouseView({
         locations={locations}
         placements={placements}
         highlightedBinIds={highlighted}
+        highlightedLocationBinId={locatedBinId}
         heatmap={heatmap}
       />
     </>

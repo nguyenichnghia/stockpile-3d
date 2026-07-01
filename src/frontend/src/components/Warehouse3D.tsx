@@ -116,18 +116,30 @@ export default function Warehouse3D({
   locations,
   placements,
   highlightedBinIds,
+  highlightedLocationBinId,
   heatmap,
 }: {
   locations: Location[];
   placements: Placement[];
   /** Bins to keep bright; when non-empty, all other lots are dimmed. */
   highlightedBinIds?: Set<number>;
+  /** A single bin (located by code) whose frame is highlighted, even if empty. */
+  highlightedLocationBinId?: number | null;
   /** When set, color every bin by its value in [0,1] instead of drawing lots. */
   heatmap?: Map<number, number>;
 }) {
   const binMatrices = useMemo(
     () => locations.map((l) => centerMatrix(l.x, l.y, l.z, l.w, l.d, l.h)),
     [locations],
+  );
+
+  // The located bin (by code): a bright frame + label, drawn even when empty.
+  const locatedBin = useMemo(
+    () =>
+      highlightedLocationBinId != null
+        ? locations.find((l) => l.id === highlightedLocationBinId)
+        : undefined,
+    [locations, highlightedLocationBinId],
   );
 
   const heatmapOn = !!heatmap;
@@ -237,6 +249,58 @@ export default function Warehouse3D({
           </div>
         </Html>
       ))}
+
+      {/* A bin located by code: a bright frame + label, shown even if empty. */}
+      {locatedBin && (
+        <>
+          <Instances
+            matrices={[
+              centerMatrix(
+                locatedBin.x,
+                locatedBin.y,
+                locatedBin.z,
+                locatedBin.w,
+                locatedBin.d,
+                locatedBin.h,
+              ),
+            ]}
+            color="#37e0a0"
+            opacity={0.9}
+            wireframe
+          />
+          <Html
+            position={[
+              locatedBin.x + locatedBin.w / 2,
+              locatedBin.z + locatedBin.h + 0.4,
+              locatedBin.y + locatedBin.d / 2,
+            ]}
+            center
+            zIndexRange={[10, 0]}
+          >
+            <div
+              style={{
+                padding: "1px 4px",
+                borderRadius: 3,
+                background: "rgba(11,16,32,0.75)",
+                color: "#9affd8",
+                border: "1px solid #37e0a0",
+                fontFamily: "system-ui, sans-serif",
+                fontSize: 9,
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+              }}
+            >
+              {[
+                locatedBin.zone,
+                locatedBin.aisle,
+                locatedBin.rack,
+                locatedBin.level,
+                locatedBin.bin,
+              ].join("-")}
+            </div>
+          </Html>
+        </>
+      )}
 
       <OrbitControls makeDefault />
       <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
