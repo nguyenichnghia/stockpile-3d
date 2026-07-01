@@ -2,6 +2,13 @@
 
 > Nhật ký vấn đề gặp phải + nguyên nhân + cách giải, viết cho chính mình (theo [03-documentation.md](./03-documentation.md) §5). Mới nhất ở trên.
 
+## 2026-07-01 — Backend `password authentication failed` khi chạy local
+
+- **Vấn đề:** chạy backend local (`mvnw spring-boot:run`) trỏ vào Postgres của Docker (`localhost:5432`) → Flyway/Hibernate báo `FATAL: password authentication failed for user "postgres"`, dù mật khẩu (`postgres/postgres`) khớp cấu hình compose và `docker exec psql` vào container thì đăng nhập được.
+- **Nguyên nhân:** máy dev có **service Postgres cài sẵn trên Windows** (`postgresql-x64-18`) đang **chiếm cổng 5432**. Backend nối `localhost:5432` trúng Postgres Windows (mật khẩu khác), không phải container Docker. `netstat -ano | grep :5432` cho thấy **hai** tiến trình cùng LISTENING. `docker exec psql` không lộ ra vì nó nối *bên trong* container.
+- **Đã sửa:** chạy Postgres của Docker ở **cổng 5433** (`-p 5433:5432`) và trỏ backend vào `jdbc:postgresql://localhost:5433/...`, tránh service Windows. (Testcontainers không bị ảnh hưởng — nó tự cấp cổng ngẫu nhiên.)
+- **Học được:** khi lỗi auth "vô lý" dù mật khẩu đúng, nghi ngờ **nối nhầm server** trước khi nghi mật khẩu. Kiểm cổng đang lắng nghe (`netstat`) và test auth **qua TCP** (`psql -h 127.0.0.1`), không chỉ qua socket nội bộ container. Nếu muốn `docker compose up` chạy như tài liệu, cần tắt service Postgres Windows hoặc đổi cổng map trong `docker-compose.yml`.
+
 ## 2026-06-22 — Lô xếp khít không bị coi là chặn (CRP)
 
 - **Vấn đề:** chạy thử `GET /api/relocation-plan` với 2 lô xếp chồng **khít** (lô dưới z[0,2], lô trên z[2,4]) → plan trả **rỗng**, tức không phát hiện lô trên chặn lô dưới. Sai với thực tế block-stacking.
