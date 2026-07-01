@@ -136,6 +136,7 @@ export default function WarehouseView({
             <option value="">{busy ? "…" : "Heatmap…"}</option>
             <option value="fill">Mức đầy</option>
             <option value="blocking">Độ bị chặn</option>
+            <option value="expiry">Sắp hết hạn</option>
           </select>
         )}
         {heatmap && (
@@ -175,12 +176,13 @@ export default function WarehouseView({
   );
 }
 
-type HeatmapMetric = "fill" | "blocking";
+type HeatmapMetric = "fill" | "blocking" | "expiry";
 
 /** Legend labels for each metric's cool (green) and hot (red) ends. */
 const LEGEND: Record<HeatmapMetric, { low: string; high: string }> = {
   fill: { low: "trống", high: "có hàng" },
   blocking: { low: "dễ lấy", high: "bị chặn" },
+  expiry: { low: "còn hạn", high: "sắp hết hạn" },
 };
 
 const btnStyle: React.CSSProperties = {
