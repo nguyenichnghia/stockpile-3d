@@ -7,9 +7,11 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
-Giai đoạn 4 (đang làm) — Realtime: 3D scene tự cập nhật khi kho thay đổi.
+Giai đoạn 4 (đang làm) — Realtime + Picking Engine.
 
 ### Added
+- **Picking Engine (đơn hàng → pick-list)** — thêm entity `PickOrder` + `OrderLine` (Flyway `V2`, bảng `pick_order` vì `order` là từ khóa SQL; `qty` đếm kiện/thùng/pallet) với CRUD `/api/orders`. `PickingService.plan(orderId)` (`GET /api/pick-plan?orderId=`) chọn lô cho từng dòng đơn và trả `PickPlan` gồm các bước theo thứ tự (relocation xen kẽ pick). Chọn lô là lõi thuần `PickPlanner`: chính sách dẫn (FEFO theo `expiry` sớm nhất, FIFO theo lô cũ nhất), phá hòa bằng ít-bị-chặn — hàng gần hết hạn không bị kẹt sau lô dễ hơn. Lô bị chặn được chèn sẵn các bước dời (tái dùng `RelocationService`/CRP) trước bước PICK → pick-list chạy được ngay. Báo `shortfall` khi thiếu hàng. Proposal-only (không ghi ledger). Package `com.stockpile.picking`; ADR-0006.
+- Test (unit thuần + Testcontainers): `PickPlannerTest` (FEFO/FIFO, phá hòa least-blocked, hạn không thua ít-bị-chặn, shortfall), `PickingServiceTest` (pick đơn, lô bị chặn → chèn relocation, thiếu hàng → shortfall).
 - **Lớp realtime (STOMP/WebSocket)** — khi ghi movement, backend đẩy `PlacementDelta` (UPSERT/REMOVE theo `lotId`) tới `/topic/lane/{laneId}`; 3D scene cập nhật tức thì, không cần reload. Phát sự kiện từ `MovementService` qua `ApplicationEventPublisher` → `PlacementBroadcaster` (`@TransactionalEventListener(AFTER_COMMIT)`, không phát khi rollback). Endpoint STOMP `/ws`, simple broker `/topic`. RELOCATE khác lane: UPSERT tới lane đích + REMOVE tới lane gốc. Frontend dùng `@stomp/stompjs`, subscribe các lane đã tải, gộp delta theo `lotId`. Package `com.stockpile.realtime`; ADR-0005.
 - Test (Testcontainers + STOMP client thật, `RANDOM_PORT`): `PlacementBroadcastTest` — putaway→UPSERT, pick→REMOVE, relocate khác lane→UPSERT+REMOVE.
 
