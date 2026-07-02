@@ -7,6 +7,12 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+Giai đoạn 4 (đang làm) — Realtime: 3D scene tự cập nhật khi kho thay đổi.
+
+### Added
+- **Lớp realtime (STOMP/WebSocket)** — khi ghi movement, backend đẩy `PlacementDelta` (UPSERT/REMOVE theo `lotId`) tới `/topic/lane/{laneId}`; 3D scene cập nhật tức thì, không cần reload. Phát sự kiện từ `MovementService` qua `ApplicationEventPublisher` → `PlacementBroadcaster` (`@TransactionalEventListener(AFTER_COMMIT)`, không phát khi rollback). Endpoint STOMP `/ws`, simple broker `/topic`. RELOCATE khác lane: UPSERT tới lane đích + REMOVE tới lane gốc. Frontend dùng `@stomp/stompjs`, subscribe các lane đã tải, gộp delta theo `lotId`. Package `com.stockpile.realtime`; ADR-0005.
+- Test (Testcontainers + STOMP client thật, `RANDOM_PORT`): `PlacementBroadcastTest` — putaway→UPSERT, pick→REMOVE, relocate khác lane→UPSERT+REMOVE.
+
 ## [0.3.0] - 2026-07-01
 Giai đoạn 3 — Thiết lập kho + Tra cứu trực quan + Heatmap "sức khỏe kho".
 
