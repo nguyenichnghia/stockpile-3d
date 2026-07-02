@@ -2,15 +2,10 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, GizmoHelper, GizmoViewport, Grid, Html } from "@react-three/drei";
+import { OrbitControls, GizmoHelper, GizmoViewport, Grid, Html, Line } from "@react-three/drei";
 import * as THREE from "three";
 
-import type { Location, Placement } from "@/lib/api";
-
-/** Human-readable bin code, e.g. "A-01-00-1-01". */
-function binCode(l: Location): string {
-  return [l.zone, l.aisle, l.rack, l.level, l.bin].join("-");
-}
+import { binCode, type Location, type Placement, type PickStepKind } from "@/lib/api";
 
 /** Green (cool, value 0) → red (hot, value 1) via yellow. */
 function heatColor(value: number): THREE.Color {
@@ -112,12 +107,70 @@ function Instances({
   );
 }
 
+/** Center of a bin in three.js coords (warehouse z is up → three Y). */
+function binCenter(l: Location): [number, number, number] {
+  return [l.x + l.w / 2, l.z + l.h / 2, l.y + l.d / 2];
+}
+
+/** A bright wireframe around one bin plus a floating label, shown even if empty. */
+function BinMarker({
+  bin,
+  color,
+  labelColor,
+  text,
+}: {
+  bin: Location;
+  color: string;
+  labelColor: string;
+  text: string;
+}) {
+  return (
+    <>
+      <Instances
+        matrices={[centerMatrix(bin.x, bin.y, bin.z, bin.w, bin.d, bin.h)]}
+        color={color}
+        opacity={0.9}
+        wireframe
+      />
+      <Html
+        position={[bin.x + bin.w / 2, bin.z + bin.h + 0.4, bin.y + bin.d / 2]}
+        center
+        zIndexRange={[10, 0]}
+      >
+        <div
+          style={{
+            padding: "1px 4px",
+            borderRadius: 3,
+            background: "rgba(11,16,32,0.75)",
+            color: labelColor,
+            border: `1px solid ${color}`,
+            fontFamily: "system-ui, sans-serif",
+            fontSize: 9,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+          }}
+        >
+          {text}
+        </div>
+      </Html>
+    </>
+  );
+}
+
+/** The current pick-list step as shown on the scene. */
+export type PlanStepMarker = {
+  kind: PickStepKind;
+  fromBinId: number;
+  toBinId: number | null;
+};
+
 export default function Warehouse3D({
   locations,
   placements,
   highlightedBinIds,
   highlightedLocationBinId,
   heatmap,
+  planStep,
 }: {
   locations: Location[];
   placements: Placement[];
@@ -127,6 +180,8 @@ export default function Warehouse3D({
   highlightedLocationBinId?: number | null;
   /** When set, color every bin by its value in [0,1] instead of drawing lots. */
   heatmap?: Map<number, number>;
+  /** Current step of an active pick-list: marks from/to bins and links them. */
+  planStep?: PlanStepMarker | null;
 }) {
   const binMatrices = useMemo(
     () => locations.map((l) => centerMatrix(l.x, l.y, l.z, l.w, l.d, l.h)),
@@ -156,6 +211,11 @@ export default function Warehouse3D({
     () => new Map(locations.map((l) => [l.id, l])),
     [locations],
   );
+
+  // Bins of the active pick-list step (marked even when a bin is empty).
+  const planFrom = planStep ? byId.get(planStep.fromBinId) : undefined;
+  const planTo =
+    planStep?.toBinId != null ? byId.get(planStep.toBinId) : undefined;
   const lotMatrix = useCallback(
     (p: Placement): THREE.Matrix4 => {
       const bin = byId.get(p.binId);
@@ -189,8 +249,9 @@ export default function Warehouse3D({
 
   // Labels only for matched lots (few of them), floating above each box, so the
   // user can read which bin a result sits in. Cheap: no labels when not searching.
+  // Skipped while a plan step is shown — its BinMarkers already label those bins.
   const labels = useMemo(() => {
-    if (!searching) return [];
+    if (!searching || planStep) return [];
     return placements
       .filter((p) => highlightedBinIds!.has(p.binId))
       .map((p) => {
@@ -205,7 +266,7 @@ export default function Warehouse3D({
         return { key: p.binId, pos, text: binCode(bin) };
       })
       .filter((l): l is { key: number; pos: [number, number, number]; text: string } => l !== null);
-  }, [placements, highlightedBinIds, searching, byId]);
+  }, [placements, highlightedBinIds, searching, byId, planStep]);
 
   return (
     <Canvas camera={{ position: [20, 20, 20], fov: 50 }} style={{ background: "#0b1020" }}>
@@ -252,53 +313,43 @@ export default function Warehouse3D({
 
       {/* A bin located by code: a bright frame + label, shown even if empty. */}
       {locatedBin && (
+        <BinMarker
+          bin={locatedBin}
+          color="#37e0a0"
+          labelColor="#9affd8"
+          text={binCode(locatedBin)}
+        />
+      )}
+
+      {/* Active pick-list step: mark the source bin (and, for a relocation,
+          the destination bin plus a dashed link) so the user sees exactly
+          which move they are about to confirm. */}
+      {planFrom && (
         <>
-          <Instances
-            matrices={[
-              centerMatrix(
-                locatedBin.x,
-                locatedBin.y,
-                locatedBin.z,
-                locatedBin.w,
-                locatedBin.d,
-                locatedBin.h,
-              ),
-            ]}
-            color="#37e0a0"
-            opacity={0.9}
-            wireframe
+          <BinMarker
+            bin={planFrom}
+            color="#ffb347"
+            labelColor="#ffd9a0"
+            text={`${planStep!.kind === "PICK" ? "Lấy" : "Dời đi"} · ${binCode(planFrom)}`}
           />
-          <Html
-            position={[
-              locatedBin.x + locatedBin.w / 2,
-              locatedBin.z + locatedBin.h + 0.4,
-              locatedBin.y + locatedBin.d / 2,
-            ]}
-            center
-            zIndexRange={[10, 0]}
-          >
-            <div
-              style={{
-                padding: "1px 4px",
-                borderRadius: 3,
-                background: "rgba(11,16,32,0.75)",
-                color: "#9affd8",
-                border: "1px solid #37e0a0",
-                fontFamily: "system-ui, sans-serif",
-                fontSize: 9,
-                whiteSpace: "nowrap",
-                pointerEvents: "none",
-              }}
-            >
-              {[
-                locatedBin.zone,
-                locatedBin.aisle,
-                locatedBin.rack,
-                locatedBin.level,
-                locatedBin.bin,
-              ].join("-")}
-            </div>
-          </Html>
+          {planTo && (
+            <>
+              <BinMarker
+                bin={planTo}
+                color="#37e0a0"
+                labelColor="#9affd8"
+                text={`Đến · ${binCode(planTo)}`}
+              />
+              <Line
+                points={[binCenter(planFrom), binCenter(planTo)]}
+                color="#ffd9a0"
+                lineWidth={1.5}
+                dashed
+                dashSize={0.3}
+                gapSize={0.15}
+              />
+            </>
+          )}
         </>
       )}
 

@@ -2,23 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Current state: MVP + algorithm core built (tags v0.1.0, v0.2.0)
+## Current state: all four roadmap engines built (tags v0.1.0 → v0.4.0)
 
-This is **no longer documentation-only** — a working backend and frontend exist. Both cores (inventory CRUD + the two engines) are implemented and tested. Do not run `git init`, recreate the folder structure, or treat the layout as merely a *target* — it exists.
+This is **no longer documentation-only** — a working backend and frontend exist. Do not run `git init`, recreate the folder structure, or treat the layout as merely a *target* — it exists.
 
 What is **built**:
 
-- **Backend** (`src/backend/`, Java + Spring Boot): the five domain entities (`Location`, `Sku`, `Lot`, `Placement`, `Movement`), inventory CRUD controllers, the append-only movement ledger with the `placement` projection (`PlacementProjectionService`, incremental + `rebuildAll` replay), the **CRP relocation engine** (`RelocationService` + pure `BlockingGraph`), and the **SLAP putaway engine** (`PutawayService`). Flyway migration `V1__core_schema.sql`. Tests use Testcontainers (real Postgres) — so `mvnw test` needs Docker running; only the pure `BlockingGraphTest` runs without it.
-- **Frontend** (`src/frontend/`, Next.js + React Three Fiber): a read-only 3D viewer (`Warehouse3D.tsx`) that fetches `/api/locations` + `/api/placements` and renders bins/lots as `InstancedMesh`. It only visualizes; it never mutates state.
-- **Infra:** `docker-compose.yml`, Dockerfiles for both, `CHANGELOG.md`, four ADRs.
+- **Backend** (`src/backend/`, Java + Spring Boot): the five domain entities (`Location`, `Sku`, `Lot`, `Placement`, `Movement`), inventory CRUD controllers, the append-only movement ledger with the `placement` projection (`PlacementProjectionService`, incremental + `rebuildAll` replay), the **CRP relocation engine** (`RelocationService` + pure `RelocationPlanner`/`BlockingGraph`), the **SLAP putaway engine** (`PutawayService` + pure `PutawayScorer`), the **picking engine** (`PickingService` + pure `PickPlanner`, FEFO/FIFO, relocations interleaved; `PickOrder`/`OrderLine`, Flyway `V2`), the **grid warehouse generator** (`com.stockpile.setup`), **locate + heatmap** (`com.stockpile.heatmap`), and the **realtime layer** (`com.stockpile.realtime`, STOMP `/ws`, `PlacementDelta` to `/topic/lane/{laneId}` after commit). Flyway migrations `V1`–`V2`. Tests use Testcontainers (real Postgres) — so `mvnw test` needs Docker running; only the pure `*PlannerTest`/`*ScorerTest`/`BlockingGraphTest` run without it.
+- **Frontend** (`src/frontend/`, Next.js + React Three Fiber): the 3D viewer (`Warehouse3D.tsx`, `InstancedMesh`) plus SKU/bin locate with highlight+dim, heatmaps, a live STOMP subscription (`lib/realtime.ts`), and pick-list step-through (`PickPlanPanel.tsx`): the engine's plan is presented on the scene and each step is executed only on explicit user confirmation via `POST /api/movements` — the scene itself never decides.
+- **Infra:** `docker-compose.yml`, Dockerfiles for both, `CHANGELOG.md`, six ADRs.
 
-What is **not built yet** (empty `.gitkeep` packages): the **picking** engine and the **realtime** layer — the Spring WebSocket delta-push to the scene (promised in ADR-0002) does **not** exist; the frontend fetches once and does not live-update.
+Not built yet (roadmap phase 3–4 leftovers): barcode-scan touchpoints, what-if layout simulation, reporting dashboard, multi-warehouse.
 
 The docs remain the single source of truth for product direction and process. Read them before non-trivial work:
 
 - [docs/00-index.md](docs/00-index.md) — table of contents + canonical repo structure (do not redefine it elsewhere).
 - [docs/01-overview.md](docs/01-overview.md) — problem, data model, NFRs, architecture, algorithm formulations + Big-O, roadmap. Read for *what* and *why*.
-- [docs/warehouse-setup.md](docs/warehouse-setup.md) — how to create `location` data (grid generator / CSV import / editor); note there is **no bulk warehouse-setup tooling yet** — only per-bin CRUD.
+- [docs/warehouse-setup.md](docs/warehouse-setup.md) — how to create `location` data; the grid generator (`POST /api/warehouse/generate`) is built, CSV import / editor are not.
 - [docs/02-git-workflow.md](docs/02-git-workflow.md) — branching, Conventional Commits, repo structure, README checklist.
 - [docs/03-documentation.md](docs/03-documentation.md) — ADR (Nygard) format, Keep a Changelog, Dev Log, Algorithm Spec conventions.
 
@@ -42,7 +42,7 @@ Target scale: medium warehouses, 10k–50k locations, ~5k–20k active lots. Pos
 
 ### Stack
 
-Frontend: Next.js + React Three Fiber, using `InstancedMesh` + frustum culling to hit ~60 fps at ~50k instances (in place). Backend: **Java + Spring Boot** — Spring Web (REST commands/queries) in place; **Spring WebSocket delta push to the scene is planned, not yet built**. Spring Data JPA/Hibernate for ORM (native queries reserved for heavy blocking lookups), Flyway for schema migrations (see [docs/adr/0002-backend-spring-boot.md](docs/adr/0002-backend-spring-boot.md)). Data: PostgreSQL (Supabase), database `stockpile_3d`. `src/` splits into `backend/` and `frontend/`. Note: because backend is Java and frontend is TypeScript, there is no shared-TS-types folder — generate a TS client from the backend's OpenAPI spec instead (per ADR-0002).
+Frontend: Next.js + React Three Fiber, using `InstancedMesh` + frustum culling to hit ~60 fps at ~50k instances (in place). Backend: **Java + Spring Boot** — Spring Web (REST commands/queries) and the Spring WebSocket/STOMP delta push to the scene (ADR-0005) both in place. Spring Data JPA/Hibernate for ORM (native queries reserved for heavy blocking lookups), Flyway for schema migrations (see [docs/adr/0002-backend-spring-boot.md](docs/adr/0002-backend-spring-boot.md)). Data: PostgreSQL (Supabase), database `stockpile_3d`. `src/` splits into `backend/` and `frontend/`. Note: because backend is Java and frontend is TypeScript, there is no shared-TS-types folder — generate a TS client from the backend's OpenAPI spec instead (per ADR-0002).
 
 ## Conventions to follow
 

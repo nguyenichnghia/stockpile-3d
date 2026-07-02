@@ -2,21 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import PickPlanPanel from "@/components/PickPlanPanel";
 import Warehouse3D from "@/components/Warehouse3D";
 import {
+  binCode,
   fetchHeatmap,
+  fetchOrders,
+  fetchPickPlan,
   locateBin,
   locateBySku,
+  recordMovement,
   type Location,
+  type Order,
+  type PickPlan,
   type Placement,
 } from "@/lib/api";
 import { applyDelta, connectPlacements } from "@/lib/realtime";
 
 /**
- * Client wrapper around the 3D scene. Adds SKU/bin locate, heatmap, and a live
- * STOMP subscription: placements are seeded from the server-rendered snapshot
- * and then updated in place as deltas arrive. The 3D layer only presents — both
- * search decisions and state changes originate in the backend.
+ * Client wrapper around the 3D scene. Adds SKU/bin locate, heatmap, pick-list
+ * step-through, and a live STOMP subscription: placements are seeded from the
+ * server-rendered snapshot and then updated in place as deltas arrive. The 3D
+ * layer only presents — search decisions and state changes originate in the
+ * backend; the one write here (confirming a pick-list step) records an
+ * engine-proposed movement after explicit user confirmation.
  */
 export default function WarehouseView({
   locations,
@@ -34,6 +43,11 @@ export default function WarehouseView({
   const [metric, setMetric] = useState<HeatmapMetric>("fill");
   const [binQuery, setBinQuery] = useState("");
   const [locatedBinId, setLocatedBinId] = useState<number | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [plan, setPlan] = useState<PickPlan | null>(null);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   // Subscribe to the lanes present in the loaded warehouse; apply each delta by
   // lotId (add / move / remove). Reconnect/cleanup handled by the disposer.
@@ -56,6 +70,71 @@ export default function WarehouseView({
       );
     });
   }, [laneIds]);
+
+  // Orders for the pick-list dropdown. Loaded once; a failure just leaves the
+  // list empty (the rest of the view works without it).
+  useEffect(() => {
+    fetchOrders()
+      .then(setOrders)
+      .catch(() => {});
+  }, []);
+
+  const binById = useMemo(
+    () => new Map(locations.map((l) => [l.id, l])),
+    [locations],
+  );
+  const binCodeOf = (binId: number) => {
+    const bin = binById.get(binId);
+    return bin ? binCode(bin) : `ô #${binId}`;
+  };
+
+  // The next step to execute, or null when the plan is finished.
+  const currentStep =
+    plan && stepIndex < plan.steps.length ? plan.steps[stepIndex] : null;
+
+  async function openPlan(orderId: number) {
+    clear(); // pick-list is its own mode; leave search first
+    setHeatmap(undefined);
+    setPlanBusy(true);
+    setPlanError(null);
+    try {
+      const p = await fetchPickPlan(orderId);
+      setPlan(p);
+      setStepIndex(0);
+    } catch (err) {
+      setPlanError(err instanceof Error ? err.message : "Lỗi lập pick-list");
+    } finally {
+      setPlanBusy(false);
+    }
+  }
+
+  // Records the current step in the ledger. The scene is NOT patched here: the
+  // backend applies the projection and pushes a STOMP delta, and the placement
+  // update flows in through the same realtime path as any other movement.
+  async function confirmStep() {
+    if (!plan || !currentStep) return;
+    setPlanBusy(true);
+    setPlanError(null);
+    try {
+      await recordMovement({
+        lotId: currentStep.lotId,
+        type: currentStep.kind,
+        fromBin: currentStep.fromBinId,
+        toBin: currentStep.toBinId,
+      });
+      setStepIndex((i) => i + 1);
+    } catch (err) {
+      setPlanError(err instanceof Error ? err.message : "Lỗi ghi bước");
+    } finally {
+      setPlanBusy(false);
+    }
+  }
+
+  function closePlan() {
+    setPlan(null);
+    setStepIndex(0);
+    setPlanError(null);
+  }
 
   async function searchBin(e: React.SyntheticEvent) {
     e.preventDefault();
@@ -143,7 +222,7 @@ export default function WarehouseView({
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        {!heatmap && (
+        {!heatmap && !plan && (
           <>
             <input
               value={query}
@@ -185,29 +264,38 @@ export default function WarehouseView({
             )}
           </>
         )}
-        {heatmap ? (
+        {heatmap && (
           <button type="button" onClick={() => setHeatmap(undefined)} style={btnStyle}>
             Tắt heatmap
           </button>
-        ) : (
-          <select
-            value=""
-            disabled={busy}
-            onChange={(e) => e.target.value && loadHeatmap(e.target.value as HeatmapMetric)}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 6,
-              border: "1px solid #33406b",
-              background: "#0f1630",
-              color: "#e6ecff",
-              fontSize: 13,
-            }}
-          >
-            <option value="">{busy ? "…" : "Heatmap…"}</option>
-            <option value="fill">Mức đầy</option>
-            <option value="blocking">Độ bị chặn</option>
-            <option value="expiry">Sắp hết hạn</option>
-          </select>
+        )}
+        {!heatmap && !plan && (
+          <>
+            <select
+              value=""
+              disabled={busy}
+              onChange={(e) => e.target.value && loadHeatmap(e.target.value as HeatmapMetric)}
+              style={selectStyle}
+            >
+              <option value="">{busy ? "…" : "Heatmap…"}</option>
+              <option value="fill">Mức đầy</option>
+              <option value="blocking">Độ bị chặn</option>
+              <option value="expiry">Sắp hết hạn</option>
+            </select>
+            <select
+              value=""
+              disabled={planBusy}
+              onChange={(e) => e.target.value && openPlan(Number(e.target.value))}
+              style={selectStyle}
+            >
+              <option value="">{planBusy ? "…" : "Pick-list…"}</option>
+              {orders.map((o) => (
+                <option key={o.id} value={o.id}>
+                  #{o.id} {o.code} ({o.status})
+                </option>
+              ))}
+            </select>
+          </>
         )}
         {heatmap && (
           <span
@@ -231,17 +319,43 @@ export default function WarehouseView({
             <span style={{ color: "#d84a3a" }}>■</span> {LEGEND[metric].high}
           </span>
         )}
-        {status && !heatmap && (
+        {status && !heatmap && !plan && (
           <span style={{ color: "#9fb0d8", fontSize: 13 }}>{status}</span>
         )}
+        {planError && !plan && (
+          <span style={{ color: "#ff8a7a", fontSize: 13 }}>{planError}</span>
+        )}
       </form>
+
+      {plan && (
+        <PickPlanPanel
+          plan={plan}
+          stepIndex={stepIndex}
+          busy={planBusy}
+          error={planError}
+          binCodeOf={binCodeOf}
+          onConfirm={confirmStep}
+          onClose={closePlan}
+        />
+      )}
 
       <Warehouse3D
         locations={locations}
         placements={placements}
-        highlightedBinIds={highlighted}
-        highlightedLocationBinId={locatedBinId}
+        highlightedBinIds={
+          plan
+            ? currentStep
+              ? new Set(
+                  currentStep.toBinId != null
+                    ? [currentStep.fromBinId, currentStep.toBinId]
+                    : [currentStep.fromBinId],
+                )
+              : undefined
+            : highlighted
+        }
+        highlightedLocationBinId={plan ? null : locatedBinId}
         heatmap={heatmap}
+        planStep={currentStep}
       />
     </>
   );
@@ -254,6 +368,15 @@ const LEGEND: Record<HeatmapMetric, { low: string; high: string }> = {
   fill: { low: "trống", high: "có hàng" },
   blocking: { low: "dễ lấy", high: "bị chặn" },
   expiry: { low: "còn hạn", high: "sắp hết hạn" },
+};
+
+const selectStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 6,
+  border: "1px solid #33406b",
+  background: "#0f1630",
+  color: "#e6ecff",
+  fontSize: 13,
 };
 
 const btnStyle: React.CSSProperties = {

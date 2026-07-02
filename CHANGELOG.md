@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Added
+- **Chạy pick-list trên 3D (xác nhận từng bước)** — chọn đơn hàng ngay trên viewer để lập pick-list (`GET /api/pick-plan`); panel bên phải liệt kê mức đáp ứng từng dòng (kèm cảnh báo `shortfall`) và chuỗi bước theo thứ tự. Bước hiện tại được đánh dấu trên scene: khung + nhãn ô nguồn ("Dời đi"/"Lấy"), ô đích ("Đến") và đường nối đứt nét khi là bước dời. Nút **Xác nhận bước** ghi movement (`POST /api/movements`, RELOCATE/PICK) — engine đề xuất, người dùng xác nhận, 3D không tự quyết; scene cập nhật qua chính kênh STOMP realtime, không vá state cục bộ. Bước lỗi (ví dụ lô đã bị người khác lấy) hiện thông báo và không nhảy bước. Component mới `PickPlanPanel`; không đổi backend.
+
 ## [0.4.0] - 2026-07-02
 Giai đoạn 4 — Realtime + Picking Engine.
 
