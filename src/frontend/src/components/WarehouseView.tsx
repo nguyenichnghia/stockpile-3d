@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Warehouse3D from "@/components/Warehouse3D";
 import {
@@ -10,19 +10,22 @@ import {
   type Location,
   type Placement,
 } from "@/lib/api";
+import { applyDelta, connectPlacements } from "@/lib/realtime";
 
 /**
- * Client wrapper around the 3D scene that adds SKU locate/search: type a SKU
- * code, the matching lots are highlighted and the rest dimmed. The 3D layer
- * only presents — the search decision comes from the backend endpoint.
+ * Client wrapper around the 3D scene. Adds SKU/bin locate, heatmap, and a live
+ * STOMP subscription: placements are seeded from the server-rendered snapshot
+ * and then updated in place as deltas arrive. The 3D layer only presents — both
+ * search decisions and state changes originate in the backend.
  */
 export default function WarehouseView({
   locations,
-  placements,
+  placements: initialPlacements,
 }: {
   locations: Location[];
   placements: Placement[];
 }) {
+  const [placements, setPlacements] = useState<Placement[]>(initialPlacements);
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState<Set<number> | undefined>();
   const [status, setStatus] = useState<string | null>(null);
@@ -31,6 +34,28 @@ export default function WarehouseView({
   const [metric, setMetric] = useState<HeatmapMetric>("fill");
   const [binQuery, setBinQuery] = useState("");
   const [locatedBinId, setLocatedBinId] = useState<number | null>(null);
+
+  // Subscribe to the lanes present in the loaded warehouse; apply each delta by
+  // lotId (add / move / remove). Reconnect/cleanup handled by the disposer.
+  const laneIds = useMemo(
+    () => Array.from(new Set(locations.map((l) => l.laneId))),
+    [locations],
+  );
+  useEffect(() => {
+    if (laneIds.length === 0) return;
+    return connectPlacements(laneIds, (d) => {
+      setPlacements((prev) =>
+        applyDelta(prev, d, (delta) => ({
+          id: -1, // delta carries no placement row id; consumers key off lotId/binId
+          lotId: delta.lotId,
+          binId: delta.binId!,
+          x: delta.x!,
+          y: delta.y!,
+          z: delta.z!,
+        })),
+      );
+    });
+  }, [laneIds]);
 
   async function searchBin(e: React.SyntheticEvent) {
     e.preventDefault();
