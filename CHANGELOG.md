@@ -7,7 +7,8 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
-Giai đoạn 4 (đang làm) — Realtime + Picking Engine.
+## [0.4.0] - 2026-07-02
+Giai đoạn 4 — Realtime + Picking Engine.
 
 ### Added
 - **Picking Engine (đơn hàng → pick-list)** — thêm entity `PickOrder` + `OrderLine` (Flyway `V2`, bảng `pick_order` vì `order` là từ khóa SQL; `qty` đếm kiện/thùng/pallet) với CRUD `/api/orders`. `PickingService.plan(orderId)` (`GET /api/pick-plan?orderId=`) chọn lô cho từng dòng đơn và trả `PickPlan` gồm các bước theo thứ tự (relocation xen kẽ pick). Chọn lô là lõi thuần `PickPlanner`: chính sách dẫn (FEFO theo `expiry` sớm nhất, FIFO theo lô cũ nhất), phá hòa bằng ít-bị-chặn — hàng gần hết hạn không bị kẹt sau lô dễ hơn. Lô bị chặn được chèn sẵn các bước dời (tái dùng `RelocationService`/CRP) trước bước PICK → pick-list chạy được ngay. Báo `shortfall` khi thiếu hàng. Proposal-only (không ghi ledger). Package `com.stockpile.picking`; ADR-0006.
