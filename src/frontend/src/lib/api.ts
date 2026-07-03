@@ -36,10 +36,28 @@ export function binCode(l: Location): string {
   return [l.zone, l.aisle, l.rack, l.level, l.bin].join("-");
 }
 
+/**
+ * Builds the error for a failed response. The backend's error handler returns
+ * {@code {message, error, status, ...}} — surface {@code message} so the UI can
+ * say "Lot 5 has no placement" instead of a bare "failed: 400".
+ */
+async function httpError(method: string, path: string, res: Response): Promise<Error> {
+  let detail = res.statusText;
+  try {
+    const body = await res.json();
+    if (typeof body?.message === "string" && body.message) {
+      detail = body.message;
+    }
+  } catch {
+    // Non-JSON body (proxy error page, empty body) — keep the status text.
+  }
+  return new Error(`${method} ${path}: ${res.status} ${detail}`.trim());
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { cache: "no-store" });
   if (!res.ok) {
-    throw new Error(`GET ${path} failed: ${res.status} ${res.statusText}`);
+    throw await httpError("GET", path, res);
   }
   return res.json() as Promise<T>;
 }
@@ -51,7 +69,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`POST ${path} failed: ${res.status} ${res.statusText}`);
+    throw await httpError("POST", path, res);
   }
   return res.json() as Promise<T>;
 }
