@@ -212,3 +212,35 @@ export type MovementDaily = { date: string; type: string; count: number };
 
 export const fetchMovementsDaily = (days = 14) =>
   getJson<MovementDaily[]>(`/api/reports/movements?days=${days}`);
+
+/** Grid parameters for a hypothetical layout (same shape the generator takes). */
+export type GridSpec = {
+  zones: number;
+  aislesPerZone: number;
+  racksPerAisle: number;
+  levelsPerRack: number;
+  binsPerLevel: number;
+  binWidth: number;
+  binDepth: number;
+  binHeight: number;
+  aisleGap: number;
+  accessFace: string;
+};
+
+export type LayoutMetrics = {
+  bins: number;
+  placedLots: number;
+  unplacedLots: number;
+  blockedLots: number;
+  fillRate: number;
+  avgDistToDock: number;
+};
+
+export type WhatIfResult = { current: LayoutMetrics; simulated: LayoutMetrics };
+
+/**
+ * Simulates re-putting the current stock into a hypothetical grid (SLAP order,
+ * in-memory). Side-effect free despite the POST — nothing is persisted.
+ */
+export const simulateLayout = (spec: GridSpec) =>
+  postJson<WhatIfResult>("/api/whatif/layout", spec);
