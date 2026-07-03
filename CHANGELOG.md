@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Fixed
+- Client API frontend hiển thị `message` lỗi chi tiết từ backend (ví dụ khi xác nhận bước pick-list thất bại vì lô đã bị lấy) thay vì chỉ mã trạng thái `400`.
+
 ### Added
 - **Điểm chạm quét mã vạch (barcode scan)** — bước đầu của "ground-truth sync" (§8.6):
   mã vạch v1 suy diễn từ định danh sẵn có (`LOT-{id}` cho lô, mã ô 5 đoạn cho ô — không thêm cột schema; ADR-0007). `GET /api/scan?code=` (package `com.stockpile.scan`, read-only) phân giải mã quét → lô (kèm vị trí hiện tại) / ô (kèm lô đang chiếm) / không nhận dạng. Xác nhận bước pick-list giờ **quét mã lô là đường chính**: khớp `LOT-{lotId}` của bước mới ghi movement, kèm `scanRef` = mã quét thô vào ledger (cột `scan_ref` chờ từ V1 giờ có dữ liệu); vẫn cho xác nhận thủ công nhưng `scanRef=null` — audit phân biệt được. Ô "tra mã ô" trên viewer thành ô quét đa năng: nhận cả mã ô lẫn `LOT-…` (định vị lô, highlight ô chứa nó). Test: `ScanServiceTest` (Testcontainers).
