@@ -2,17 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Current state: all four roadmap engines built (tags v0.1.0 → v0.4.0)
+## Current state: phases 1–3 complete, phase 4 analytics built (tags v0.1.0 → v0.6.0)
 
 This is **no longer documentation-only** — a working backend and frontend exist. Do not run `git init`, recreate the folder structure, or treat the layout as merely a *target* — it exists.
 
 What is **built**:
 
-- **Backend** (`src/backend/`, Java + Spring Boot): the five domain entities (`Location`, `Sku`, `Lot`, `Placement`, `Movement`), inventory CRUD controllers, the append-only movement ledger with the `placement` projection (`PlacementProjectionService`, incremental + `rebuildAll` replay), the **CRP relocation engine** (`RelocationService` + pure `RelocationPlanner`/`BlockingGraph`), the **SLAP putaway engine** (`PutawayService` + pure `PutawayScorer`), the **picking engine** (`PickingService` + pure `PickPlanner`, FEFO/FIFO, relocations interleaved; `PickOrder`/`OrderLine`, Flyway `V2`), the **grid warehouse generator** (`com.stockpile.setup`), **locate + heatmap** (`com.stockpile.heatmap`), and the **realtime layer** (`com.stockpile.realtime`, STOMP `/ws`, `PlacementDelta` to `/topic/lane/{laneId}` after commit). Flyway migrations `V1`–`V2`. Tests use Testcontainers (real Postgres) — so `mvnw test` needs Docker running; only the pure `*PlannerTest`/`*ScorerTest`/`BlockingGraphTest` run without it.
-- **Frontend** (`src/frontend/`, Next.js + React Three Fiber): the 3D viewer (`Warehouse3D.tsx`, `InstancedMesh`) plus SKU/bin locate with highlight+dim, heatmaps, a live STOMP subscription (`lib/realtime.ts`), and pick-list step-through (`PickPlanPanel.tsx`): the engine's plan is presented on the scene and each step is executed only on explicit user confirmation via `POST /api/movements` — the scene itself never decides.
-- **Infra:** `docker-compose.yml`, Dockerfiles for both, `CHANGELOG.md`, six ADRs.
+- **Backend** (`src/backend/`, Java + Spring Boot): the five domain entities (`Location`, `Sku`, `Lot`, `Placement`, `Movement`), inventory CRUD controllers, the append-only movement ledger with the `placement` projection (`PlacementProjectionService`, incremental + `rebuildAll` replay), the **CRP relocation engine** (`RelocationService` + pure `RelocationPlanner`/`BlockingGraph`), the **SLAP putaway engine** (`PutawayService` + pure `PutawayScorer`), the **picking engine** (`PickingService` + pure `PickPlanner`, FEFO/FIFO, relocations interleaved; `PickOrder`/`OrderLine`, Flyway `V2`), the **grid warehouse generator** (`com.stockpile.setup`), **locate + heatmap** (`com.stockpile.heatmap`), the **realtime layer** (`com.stockpile.realtime`, STOMP `/ws`, `PlacementDelta` to `/topic/lane/{laneId}` after commit), the **scan resolver** (`com.stockpile.scan`, `GET /api/scan` — v1 barcodes are derived ids per ADR-0007, ledger records `scanRef`), **reporting aggregates** (`com.stockpile.reporting`, `/api/reports/*`) and the **what-if layout simulator** (`com.stockpile.whatif`, in-memory composition of grid builder + `PutawayScorer` + `BlockingGraph`, ADR-0008). Flyway migrations `V1`–`V2`. Tests use Testcontainers (real Postgres) — so `mvnw test` needs Docker running; only the pure `*PlannerTest`/`*ScorerTest`/`BlockingGraphTest` run without it.
+- **Frontend** (`src/frontend/`, Next.js + React Three Fiber): the 3D viewer (`Warehouse3D.tsx`, `InstancedMesh`) plus SKU locate and a scan box (bin codes and `LOT-…`) with highlight+dim, heatmaps, a live STOMP subscription (`lib/realtime.ts`), pick-list step-through (`PickPlanPanel.tsx`) where **scanning the lot barcode is the primary confirmation** (manual confirm records `scanRef=null`) and each step is executed only on explicit user confirmation via `POST /api/movements` — the scene itself never decides; and a `/reports` dashboard (KPI tiles, stacked movement-throughput chart, what-if form).
+- **Infra:** `docker-compose.yml`, Dockerfiles for both, `CHANGELOG.md`, eight ADRs.
 
-Not built yet (roadmap phase 3–4 leftovers): barcode-scan touchpoints, what-if layout simulation, reporting dashboard, multi-warehouse.
+Not built yet (roadmap leftover): multi-warehouse (needs its own ADR — global spatial index decision in docs/01 §8 is due for review there). Known local quirk: a stale production `.next` makes `next dev` 404 — delete `.next` before `npm run dev` after a build.
 
 The docs remain the single source of truth for product direction and process. Read them before non-trivial work:
 
