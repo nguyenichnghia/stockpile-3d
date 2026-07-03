@@ -9,9 +9,9 @@ import {
   fetchHeatmap,
   fetchOrders,
   fetchPickPlan,
-  locateBin,
   locateBySku,
   recordMovement,
+  resolveScan,
   type Location,
   type Order,
   type PickPlan,
@@ -111,7 +111,9 @@ export default function WarehouseView({
   // Records the current step in the ledger. The scene is NOT patched here: the
   // backend applies the projection and pushes a STOMP delta, and the placement
   // update flows in through the same realtime path as any other movement.
-  async function confirmStep() {
+  // scanRef is the barcode the user scanned to confirm (null = manual confirm);
+  // the ledger keeps it, so unscanned touches stay auditable (ADR-0007).
+  async function confirmStep(scanRef: string | null) {
     if (!plan || !currentStep) return;
     setPlanBusy(true);
     setPlanError(null);
@@ -121,6 +123,7 @@ export default function WarehouseView({
         type: currentStep.kind,
         fromBin: currentStep.fromBinId,
         toBin: currentStep.toBinId,
+        scanRef,
       });
       setStepIndex((i) => i + 1);
     } catch (err) {
@@ -136,24 +139,43 @@ export default function WarehouseView({
     setPlanError(null);
   }
 
-  async function searchBin(e: React.SyntheticEvent) {
+  // One box for every scanned/typed code (ADR-0007): a bin code highlights the
+  // bin frame; a "LOT-{id}" code highlights the bin its lot sits in (dimming
+  // the rest, same as a SKU search with one match).
+  async function searchScan(e: React.SyntheticEvent) {
     e.preventDefault();
     const code = binQuery.trim();
+    setLocatedBinId(null);
+    setHighlighted(undefined);
     if (!code) {
-      setLocatedBinId(null);
       setStatus(null);
       return;
     }
     setBusy(true);
     try {
-      const result = await locateBin(code);
-      setLocatedBinId(result.found ? result.binId : null);
-      setStatus(
-        result.found ? `Ô ${result.code}` : `Không tìm thấy ô "${code}"`,
-      );
+      const result = await resolveScan(code);
+      if (result.type === "BIN" && result.found && result.bin) {
+        setLocatedBinId(result.bin.id);
+        setStatus(
+          `Ô ${result.bin.code}` +
+            (result.bin.lotIds.length > 0 ? ` · ${result.bin.lotIds.length} lô` : " · trống"),
+        );
+      } else if (result.type === "LOT" && result.found && result.lot) {
+        if (result.lot.binId != null) {
+          setHighlighted(new Set([result.lot.binId]));
+          setStatus(`Lô #${result.lot.id} (${result.lot.sku}) ở ô ${result.lot.binCode}`);
+        } else {
+          setStatus(`Lô #${result.lot.id} (${result.lot.sku}) chưa đặt trong kho`);
+        }
+      } else if (result.type === "LOT") {
+        setStatus(`Không có lô "${code}"`);
+      } else if (result.type === "BIN") {
+        setStatus(`Không tìm thấy ô "${code}"`);
+      } else {
+        setStatus(`Mã không nhận dạng được: "${code}"`);
+      }
     } catch (err) {
-      setLocatedBinId(null);
-      setStatus(err instanceof Error ? err.message : "Lỗi tra ô");
+      setStatus(err instanceof Error ? err.message : "Lỗi tra mã");
     } finally {
       setBusy(false);
     }
@@ -243,8 +265,8 @@ export default function WarehouseView({
             <input
               value={binQuery}
               onChange={(e) => setBinQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && searchBin(e)}
-              placeholder="Tra mã ô (A-01-00-1-01)…"
+              onKeyDown={(e) => e.key === "Enter" && searchScan(e)}
+              placeholder="Quét mã (ô hoặc LOT-…)…"
               style={{
                 padding: "6px 10px",
                 borderRadius: 6,
@@ -254,8 +276,8 @@ export default function WarehouseView({
                 fontSize: 13,
               }}
             />
-            <button type="button" onClick={searchBin} disabled={busy} style={btnStyle}>
-              Tra ô
+            <button type="button" onClick={searchScan} disabled={busy} style={btnStyle}>
+              Tra mã
             </button>
             {(highlighted || locatedBinId != null) && (
               <button type="button" onClick={clear} style={btnStyle}>

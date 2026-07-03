@@ -1,12 +1,20 @@
 "use client";
 
-import type { PickPlan } from "@/lib/api";
+import { useState } from "react";
+
+import type { PickPlan, PickStep } from "@/lib/api";
 
 /**
  * Side panel presenting a proposed pick-list: per-line fulfilment, the ordered
- * steps, and a confirm button for the current step. Presentational only — the
- * engine proposed the plan, the user confirms each step, and the parent records
- * the movement (the 3D layer never moves lots on its own).
+ * steps, and confirmation of the current step. Presentational only — the engine
+ * proposed the plan, the user confirms each step, and the parent records the
+ * movement (the 3D layer never moves lots on its own).
+ *
+ * Confirming by scanning the lot barcode ("LOT-{id}", ADR-0007) is the primary
+ * path — the scan value is recorded as the movement's scanRef, giving the
+ * ledger ground truth that the right physical box was touched. A manual
+ * fallback stays available but records scanRef=null, so unscanned steps remain
+ * auditable.
  */
 export default function PickPlanPanel({
   plan,
@@ -23,10 +31,12 @@ export default function PickPlanPanel({
   busy: boolean;
   error: string | null;
   binCodeOf: (binId: number) => string;
-  onConfirm: () => void;
+  /** Confirm the current step; scanRef is the scanned code, or null if manual. */
+  onConfirm: (scanRef: string | null) => void;
   onClose: () => void;
 }) {
   const done = stepIndex >= plan.steps.length;
+  const current = done ? null : plan.steps[stepIndex];
 
   return (
     <aside
@@ -116,12 +126,79 @@ export default function PickPlanPanel({
           <p style={{ margin: 0, color: "#37e0a0" }}>✓ Hoàn tất pick-list</p>
         )
       ) : (
+        // key remounts the form per step: scan value and error never leak
+        // from one step into the next.
+        <ScanConfirm
+          key={stepIndex}
+          step={current!}
+          stepNumber={stepIndex + 1}
+          stepTotal={plan.steps.length}
+          busy={busy}
+          onConfirm={onConfirm}
+        />
+      )}
+    </aside>
+  );
+}
+
+/**
+ * Scan-to-confirm for one step: the operator scans the lot barcode; only the
+ * expected code confirms. The manual fallback confirms with scanRef=null.
+ */
+function ScanConfirm({
+  step,
+  stepNumber,
+  stepTotal,
+  busy,
+  onConfirm,
+}: {
+  step: PickStep;
+  stepNumber: number;
+  stepTotal: number;
+  busy: boolean;
+  onConfirm: (scanRef: string | null) => void;
+}) {
+  const [scan, setScan] = useState("");
+  const [scanError, setScanError] = useState<string | null>(null);
+  const expected = `LOT-${step.lotId}`;
+
+  function submitScan(e: React.FormEvent) {
+    e.preventDefault();
+    const code = scan.trim();
+    if (code.toUpperCase() === expected) {
+      setScanError(null);
+      onConfirm(code);
+    } else {
+      setScanError(`Sai mã — bước này cần ${expected}`);
+    }
+  }
+
+  return (
+    <>
+      {scanError && <p style={{ margin: 0, color: "#ff8a7a" }}>{scanError}</p>}
+      {/* Primary path: scan the lot barcode to confirm the step. */}
+      <form onSubmit={submitScan} style={{ display: "flex", gap: 6 }}>
+        <input
+          value={scan}
+          onChange={(e) => setScan(e.target.value)}
+          placeholder={`Quét mã lô (${expected})…`}
+          autoFocus
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid #33406b",
+            background: "#0f1630",
+            color: "#e6ecff",
+            fontSize: 13,
+          }}
+        />
         <button
-          type="button"
-          onClick={onConfirm}
+          type="submit"
           disabled={busy}
           style={{
-            padding: "8px 12px",
+            padding: "6px 12px",
             borderRadius: 6,
             border: "1px solid #33406b",
             background: "#5b6cff",
@@ -130,9 +207,26 @@ export default function PickPlanPanel({
             cursor: "pointer",
           }}
         >
-          {busy ? "…" : `Xác nhận bước ${stepIndex + 1}/${plan.steps.length}`}
+          {busy ? "…" : `Quét bước ${stepNumber}/${stepTotal}`}
         </button>
-      )}
-    </aside>
+      </form>
+      {/* Fallback without a scanner: still confirms, but scanRef stays null. */}
+      <button
+        type="button"
+        onClick={() => onConfirm(null)}
+        disabled={busy}
+        style={{
+          padding: "5px 12px",
+          borderRadius: 6,
+          border: "1px solid #33406b",
+          background: "transparent",
+          color: "#9fb0d8",
+          fontSize: 12,
+          cursor: "pointer",
+        }}
+      >
+        Xác nhận không quét
+      </button>
+    </>
   );
 }
