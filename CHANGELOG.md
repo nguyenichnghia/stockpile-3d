@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-03
+Hoàn tất giai đoạn 3 — Vận hành trên 3D: chạy pick-list từng bước + quét mã vạch.
+
 ### Fixed
 - Client API frontend hiển thị `message` lỗi chi tiết từ backend (ví dụ khi xác nhận bước pick-list thất bại vì lô đã bị lấy) thay vì chỉ mã trạng thái `400`.
 

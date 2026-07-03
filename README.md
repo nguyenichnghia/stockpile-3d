@@ -115,12 +115,16 @@ Sau đó mở http://localhost:3000 và thử ô "Tra mã hàng", "Tra mã ô", 
 | Nhóm | Tính năng | API |
 |---|---|---|
 | Tồn kho | CRUD `sku`/`location`/`lot`, ghi ledger, projection placement | `/api/skus` · `/api/locations` · `/api/lots` · `/api/movements` · `/api/placements` |
-| Engine | Relocation (CRP) · Putaway (SLAP) — chỉ đề xuất, không ghi ledger | `/api/relocation-plan` · `/api/putaway-suggestion` |
+| Engine | Relocation (CRP) · Putaway (SLAP) · Picking (FEFO/FIFO, tự chèn bước dời) — chỉ đề xuất, không ghi ledger | `/api/relocation-plan` · `/api/putaway-suggestion` · `/api/pick-plan?orderId=` |
+| Đơn hàng | CRUD đơn hàng (`PickOrder` + dòng đơn theo SKU/qty) | `/api/orders` |
+| Chạy pick-list trên 3D | Chọn đơn → panel các bước; bước hiện tại đánh dấu trên scene; xác nhận từng bước ghi movement — **quét mã lô là đường chính**, thủ công ghi `scanRef=null` | `GET /api/pick-plan` + `POST /api/movements` |
+| Quét mã vạch | Phân giải mã quét: `LOT-{id}` → lô + vị trí; mã ô 5 đoạn → ô + lô đang chiếm (ADR-0007) | `GET /api/scan?code=` |
+| Realtime | Ghi movement → đẩy delta STOMP tới scene theo lane, không cần reload | WS `/ws`, topic `/topic/lane/{laneId}` |
 | Thiết lập kho | Sinh kho theo lưới (tạo hàng loạt `location`) | `POST /api/warehouse/generate` |
-| Tra cứu trực quan | Tra mã hàng (SKU) → highlight + làm mờ + nhãn ô · Tra mã ô → tô sáng khung ô (kể cả trống) | `GET /api/lots/locate?sku=` · `GET /api/locations/locate?code=` |
+| Tra cứu trực quan | Tra mã hàng (SKU) → highlight + làm mờ + nhãn ô · Quét/tra mã (ô hoặc `LOT-…`) → tô sáng | `GET /api/lots/locate?sku=` · `GET /api/scan?code=` |
 | Heatmap | Tô màu cả kho theo mức đầy / độ bị chặn / sắp hết hạn | `GET /api/heatmap?metric={fill\|blocking\|expiry}` |
 
-Cách dùng trên 3D: ô nhập "Tra mã hàng" / "Tra mã ô" và dropdown "Heatmap…" ở góc trên trái màn hình.
+Cách dùng trên 3D: ô "Tra mã hàng" / "Quét mã", dropdown "Heatmap…" và "Pick-list…" ở góc trên trái màn hình.
 
 ## Tài liệu
 
@@ -131,4 +135,4 @@ Cách dùng trên 3D: ô nhập "Tra mã hàng" / "Tra mã ô" và dropdown "Hea
 
 ## Trạng thái
 
-Đã có **backend + frontend chạy được** với hai engine lõi và lớp tra cứu trực quan (tag `v0.1.0` MVP, `v0.2.0` lõi thuật toán; Giai đoạn 3 đang hoàn thiện). **Chưa làm:** engine picking và lớp realtime (WebSocket đẩy delta) — hiện frontend fetch một lần, không tự cập nhật. Lộ trình & tiến độ: [CHANGELOG](CHANGELOG.md) · [docs/commit-plan.md](docs/commit-plan.md).
+**Giai đoạn 1–3 của roadmap đã xong** (tag `v0.1.0` → `v0.5.0`): data model + ledger, hai engine lõi (CRP/SLAP), tra cứu + heatmap, picking engine, realtime STOMP, chạy pick-list từng bước trên 3D và điểm chạm quét mã vạch (ADR-0007). **Còn lại (giai đoạn 4):** what-if layout simulation, reporting dashboard, multi-warehouse. Lộ trình & tiến độ: [CHANGELOG](CHANGELOG.md) · [docs/commit-plan.md](docs/commit-plan.md).
