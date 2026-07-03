@@ -44,6 +44,17 @@ public class WarehouseGeneratorService {
 					"Warehouse already has locations; generation is only allowed on an empty warehouse");
 		}
 
+		List<Location> saved = locationRepository.saveAll(buildGrid(spec));
+		return new WarehouseGenerationResult(saved.size(), spec.zones(), spec.aislesPerZone(),
+				spec.racksPerAisle(), spec.levelsPerRack(), spec.binsPerLevel());
+	}
+
+	/**
+	 * Builds the grid's {@link Location}s in memory (ids unset, nothing saved).
+	 * Pure, so the what-if simulator can lay out a hypothetical warehouse with
+	 * the exact same geometry the real generator would persist.
+	 */
+	public static List<Location> buildGrid(WarehouseGridSpec spec) {
 		BigDecimal binW = spec.binWidth();
 		BigDecimal binD = spec.binDepth();
 		BigDecimal binH = spec.binHeight();
@@ -74,10 +85,7 @@ public class WarehouseGeneratorService {
 				}
 			}
 		}
-
-		List<Location> saved = locationRepository.saveAll(batch);
-		return new WarehouseGenerationResult(saved.size(), spec.zones(), spec.aislesPerZone(),
-				spec.racksPerAisle(), spec.levelsPerRack(), spec.binsPerLevel());
+		return batch;
 	}
 
 	private static Location slot(WarehouseGridSpec spec, String laneId,
