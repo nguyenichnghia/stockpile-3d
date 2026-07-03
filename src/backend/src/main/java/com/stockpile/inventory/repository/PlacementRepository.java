@@ -18,4 +18,7 @@ public interface PlacementRepository extends JpaRepository<Placement, Long> {
 
 	/** Current placements of every lot of the given SKU code (for locate/search). */
 	List<Placement> findByLot_Sku_CodeIgnoreCase(String code);
+
+	/** Lots currently placed in the given bin (for scan resolve). */
+	List<Placement> findByBinId(Long binId);
 }

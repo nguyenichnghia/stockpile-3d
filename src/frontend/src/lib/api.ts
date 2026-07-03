@@ -77,18 +77,28 @@ export type LocateResult = {
 export const locateBySku = (sku: string) =>
   getJson<LocateResult>(`/api/lots/locate?sku=${encodeURIComponent(sku)}`);
 
-export type BinLocateResult = {
+export type ScanResult = {
   code: string;
+  type: "LOT" | "BIN" | "UNKNOWN";
   found: boolean;
-  binId: number | null;
-  x: number | null;
-  y: number | null;
-  z: number | null;
+  /** Set when a LOT code resolved; binId/binCode/laneId null if unplaced. */
+  lot: {
+    id: number;
+    sku: string;
+    binId: number | null;
+    binCode: string | null;
+    laneId: string | null;
+  } | null;
+  /** Set when a BIN code resolved; lotIds empty for an empty bin. */
+  bin: { id: number; code: string; laneId: string; lotIds: number[] } | null;
 };
 
-/** Locate a single bin by its full code (zone-aisle-rack-level-bin). */
-export const locateBin = (code: string) =>
-  getJson<BinLocateResult>(`/api/locations/locate?code=${encodeURIComponent(code)}`);
+/**
+ * Resolves a scanned (or typed) code — "LOT-{id}" or a full bin code
+ * "zone-aisle-rack-level-bin" — to the lot or bin it names (ADR-0007).
+ */
+export const resolveScan = (code: string) =>
+  getJson<ScanResult>(`/api/scan?code=${encodeURIComponent(code)}`);
 
 export type HeatmapCell = { binId: number; value: number };
 
@@ -149,6 +159,8 @@ export type MovementRequest = {
   type: PickStepKind;
   fromBin: number | null;
   toBin: number | null;
+  /** Raw scanned code when the step was confirmed by scan; null = unscanned. */
+  scanRef?: string | null;
 };
 
 export type Movement = MovementRequest & { id: number; ts: string };
