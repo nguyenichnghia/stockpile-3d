@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import WarehouseView from "@/components/WarehouseView";
 import { fetchLocations, fetchPlacements, type Location, type Placement } from "@/lib/api";
 
@@ -29,6 +31,12 @@ export default async function Home() {
         }}
       >
         <strong>Stockpile-3D</strong>
+        <Link
+          href="/reports"
+          style={{ pointerEvents: "auto", color: "#9fb0d8", fontSize: 13, marginLeft: 12 }}
+        >
+          Báo cáo →
+        </Link>
         <div style={{ fontSize: 13, opacity: 0.8 }}>
           {error
             ? `Không tải được dữ liệu — ${error}`
