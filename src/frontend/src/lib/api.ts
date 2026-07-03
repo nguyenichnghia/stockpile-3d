@@ -190,3 +190,25 @@ export type Movement = MovementRequest & { id: number; ts: string };
  */
 export const recordMovement = (m: MovementRequest) =>
   postJson<Movement>("/api/movements", m);
+
+/** Warehouse KPIs for the reporting dashboard (unit-based counts). */
+export type ReportSummary = {
+  totalBins: number;
+  occupiedBins: number;
+  fillRate: number;
+  activeLots: number;
+  blockedLots: number;
+  expiringSoon: number;
+  expired: number;
+  openOrders: number;
+  movementsToday: number;
+};
+
+export const fetchReportSummary = () =>
+  getJson<ReportSummary>("/api/reports/summary");
+
+/** Ledger throughput for one (UTC day, movement type); zero days emit no row. */
+export type MovementDaily = { date: string; type: string; count: number };
+
+export const fetchMovementsDaily = (days = 14) =>
+  getJson<MovementDaily[]>(`/api/reports/movements?days=${days}`);

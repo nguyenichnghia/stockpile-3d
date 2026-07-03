@@ -7,7 +7,8 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-07-03
+### Added
+- **Reporting dashboard (giai đoạn 4)** — backend `com.stockpile.reporting` (read-only, cùng nguồn dữ liệu với scene): `GET /api/reports/summary` trả KPI kho (mức lấp đầy, số lô, **lô bị chặn** — tái dùng `BlockingGraph` theo lane, sắp/quá hạn theo horizon FEFO 30 ngày, đơn OPEN, movement hôm nay) và `GET /api/reports/movements?days=` (mặc định 14, tối đa 90) trả bút toán ledger theo (ngày UTC, loại). Frontend trang `/reports`: hàng thẻ KPI (icon + màu trạng thái khi có vấn đề) + biểu đồ cột chồng movement theo ngày (màu series cố định theo loại, đã kiểm tra CVD trên nền tối; tooltip hover, chú giải, kèm bảng số liệu), link qua lại với viewer 3D. Ngày tính theo UTC (v1 chưa có timezone kho — xem lại khi multi-warehouse). Test: `ReportingServiceTest` (Testcontainers).
 Hoàn tất giai đoạn 3 — Vận hành trên 3D: chạy pick-list từng bước + quét mã vạch.
 
 ### Fixed
