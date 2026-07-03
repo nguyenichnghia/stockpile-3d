@@ -6,8 +6,10 @@ import Link from "next/link";
 import {
   fetchMovementsDaily,
   fetchReportSummary,
+  simulateLayout,
   type MovementDaily,
   type ReportSummary,
+  type WhatIfResult,
 } from "@/lib/api";
 
 /**
@@ -131,7 +133,201 @@ export default function ReportsPage() {
       )}
 
       {rows && <ThroughputChart rows={rows} />}
+
+      {summary && <WhatIfSection />}
     </main>
+  );
+}
+
+/**
+ * Layout what-if: re-put the current stock into a hypothetical grid (backend
+ * simulation, nothing persisted) and compare the two layouts side by side.
+ */
+function WhatIfSection() {
+  const [zones, setZones] = useState(1);
+  const [aisles, setAisles] = useState(2);
+  const [racks, setRacks] = useState(2);
+  const [levels, setLevels] = useState(1);
+  const [bins, setBins] = useState(12);
+  const [result, setResult] = useState<WhatIfResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(
+        await simulateLayout({
+          zones,
+          aislesPerZone: aisles,
+          racksPerAisle: racks,
+          levelsPerRack: levels,
+          binsPerLevel: bins,
+          binWidth: 1,
+          binDepth: 1,
+          binHeight: 1,
+          aisleGap: 2,
+          accessFace: "TOP",
+        }),
+      );
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof Error ? err.message : "Lỗi mô phỏng");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const fields: [string, number, (v: number) => void][] = [
+    ["Zone", zones, setZones],
+    ["Aisle/zone", aisles, setAisles],
+    ["Rack/aisle", racks, setRacks],
+    ["Tầng/rack", levels, setLevels],
+    ["Ô/tầng", bins, setBins],
+  ];
+
+  return (
+    <section
+      aria-label="Mô phỏng what-if"
+      style={{
+        marginTop: 24,
+        background: SURFACE,
+        border: "1px solid #33406b",
+        borderRadius: 8,
+        padding: 16,
+        maxWidth: 900,
+      }}
+    >
+      <h2 style={{ margin: "0 0 4px", fontSize: 14 }}>What-if · thử một layout khác</h2>
+      <p style={{ margin: "0 0 12px", color: INK_MUTED, fontSize: 12 }}>
+        Xếp lại toàn bộ lô hiện có vào lưới giả định bằng engine SLAP (mô phỏng
+        trong bộ nhớ — không ghi gì vào kho). Ô 1×1×1 m, lối đi 2 m, lấy từ trên.
+      </p>
+
+      <form onSubmit={run} style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+        {fields.map(([label, value, set]) => (
+          <label key={label} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: INK_2 }}>
+            {label}
+            <input
+              type="number"
+              min={1}
+              value={value}
+              onChange={(e) => set(Math.max(1, Number(e.target.value)))}
+              style={{
+                width: 76,
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "1px solid #33406b",
+                background: "#0b1020",
+                color: INK,
+                fontSize: 13,
+              }}
+            />
+          </label>
+        ))}
+        <button
+          type="submit"
+          disabled={busy}
+          style={{
+            padding: "7px 14px",
+            borderRadius: 6,
+            border: "1px solid #33406b",
+            background: "#5b6cff",
+            color: "#fff",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          {busy ? "…" : "Mô phỏng"}
+        </button>
+      </form>
+
+      {error && <p style={{ color: SERIOUS, fontSize: 13 }}>{error}</p>}
+
+      {result && (
+        <table
+          style={{
+            marginTop: 14,
+            borderCollapse: "collapse",
+            fontSize: 13,
+            color: INK,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, textAlign: "left" }}>Chỉ số</th>
+              <th style={thStyle}>Hiện tại</th>
+              <th style={thStyle}>Mô phỏng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <CompareRow label="Số ô" a={result.current.bins} b={result.simulated.bins} />
+            <CompareRow label="Lô xếp được" a={result.current.placedLots} b={result.simulated.placedLots} />
+            <CompareRow
+              label="Lô không còn chỗ"
+              a={result.current.unplacedLots}
+              b={result.simulated.unplacedLots}
+              lowerIsBetter
+            />
+            <CompareRow
+              label="Lô bị chặn"
+              a={result.current.blockedLots}
+              b={result.simulated.blockedLots}
+              lowerIsBetter
+            />
+            <CompareRow
+              label="Mức lấp đầy"
+              a={result.current.fillRate}
+              b={result.simulated.fillRate}
+              fmt={(v) => `${(v * 100).toFixed(1)}%`}
+            />
+            <CompareRow
+              label="Khoảng cách tới dock (TB)"
+              a={result.current.avgDistToDock}
+              b={result.simulated.avgDistToDock}
+              fmt={(v) => v.toFixed(2) + " m"}
+              lowerIsBetter
+            />
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+/** One metric row; the delta is colored good/bad only when direction is known. */
+function CompareRow({
+  label,
+  a,
+  b,
+  fmt = (v: number) => String(v),
+  lowerIsBetter,
+}: {
+  label: string;
+  a: number;
+  b: number;
+  fmt?: (v: number) => string;
+  lowerIsBetter?: boolean;
+}) {
+  let deltaColor = INK_MUTED;
+  let arrow = "";
+  if (lowerIsBetter && b !== a) {
+    const better = b < a;
+    deltaColor = better ? "#0ca30c" : CRITICAL;
+    arrow = better ? " ↓" : " ↑";
+  }
+  return (
+    <tr>
+      <td style={{ ...tdStyle, color: INK_2 }}>{label}</td>
+      <td style={{ ...tdStyle, textAlign: "right" }}>{fmt(a)}</td>
+      <td style={{ ...tdStyle, textAlign: "right", color: deltaColor === INK_MUTED ? INK : deltaColor }}>
+        {fmt(b)}
+        {arrow}
+      </td>
+    </tr>
   );
 }
 
