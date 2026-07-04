@@ -1,6 +1,6 @@
 # Data model — Stockpile-3D
 
-> Mô tả chi tiết schema PostgreSQL (5 bảng, Flyway `V1`), từng cột + ràng buộc + **lý do thiết kế**. Nguồn code: [V1__core_schema.sql](../src/backend/src/main/resources/db/migration/V1__core_schema.sql) và entities trong `src/backend/.../inventory/domain/`. Tổng quan: [01-overview.md §6](./01-overview.md). Nghiệp vụ: [business.md](./business.md).
+> Mô tả chi tiết schema PostgreSQL (lõi 5 bảng ở Flyway `V1`; `V2` thêm picking, `V3` thêm multi-warehouse — [ADR-0009](./adr/0009-multi-warehouse.md)), từng cột + ràng buộc + **lý do thiết kế**. Nguồn code: [V1__core_schema.sql](../src/backend/src/main/resources/db/migration/V1__core_schema.sql), [V3__multi_warehouse.sql](../src/backend/src/main/resources/db/migration/V3__multi_warehouse.sql) và entities trong `src/backend/.../inventory/domain/`. Tổng quan: [01-overview.md §6](./01-overview.md). Nghiệp vụ: [business.md](./business.md).
 
 ---
 
@@ -12,6 +12,7 @@ Hệ thống có **5 bảng**, hãy hình dung như 5 cuốn sổ trong kho:
 
 | Bảng | Nói nôm na là gì | Ví dụ một dòng |
 |---|---|---|
+| **warehouse** | Danh sách **các kho vật lý** (từ V3) | "Kho MAIN — Kho trung tâm" |
 | **sku** | Danh mục **loại sản phẩm** (như "menu") | "Sữa tươi TH, hộp 1L, hàng FEFO" |
 | **location** | Danh sách **các ô chứa** trong kho (như sơ đồ chỗ ngồi) | "Ô Zone A - Kệ 3 - Tầng 2, ở tọa độ (5,3,2)" |
 | **lot** | Một **kiện hàng cụ thể** đang/​sẽ ở trong kho | "Kiện sữa #1234, hết hạn 1/7/2026" |
@@ -35,7 +36,7 @@ Vài từ kỹ thuật sẽ gặp bên dưới, dịch nhanh:
 
 ## Nguyên tắc thiết kế chung
 
-- **Khóa chính `BIGINT GENERATED ALWAYS AS IDENTITY`** (số tự tăng) — nhẹ, index nhanh, join rẻ. Đủ cho single-warehouse; nếu sau cần multi-warehouse/sync thì cân nhắc UUID (ghi [ADR-0002](./adr/0002-backend-spring-boot.md) bối cảnh).
+- **Khóa chính `BIGINT GENERATED ALWAYS AS IDENTITY`** (số tự tăng) — nhẹ, index nhanh, join rẻ. Multi-warehouse (V3) vẫn dùng chung một DB nên BIGINT giữ nguyên; chỉ cân nhắc UUID nếu sau này cần sync giữa nhiều DB độc lập.
 - **Enum lưu `VARCHAR` + `CHECK constraint`** (không dùng Postgres enum type) — dễ thêm giá trị, map thẳng JPA `@Enumerated(STRING)`, tránh migration phức tạp khi đổi enum.
 - **Tọa độ & kích thước = `NUMERIC(12,3)` rời** (x,y,z,w,d,h) — minh bạch, truy vấn blocking đọc trực tiếp từng trục. Không gói thành kiểu phức hợp.
 - **`movement` append-only** — chỉ INSERT, không UPDATE/DELETE (enforce ở tầng app); là nguồn sự thật. `placement` là projection ([ADR-0003](./adr/0003-ledger-projection.md)).
@@ -106,17 +107,28 @@ erDiagram
 
 **Vì sao:** SKU là "loại sản phẩm"; nhiều `lot` cùng một SKU. `handling` ở cấp SKU vì cùng loại hàng thì cùng kỷ luật xuất.
 
+### `warehouse` — site kho vật lý (V3, ADR-0009)
+| Cột | Kiểu | Ràng buộc | Ý nghĩa |
+|---|---|---|---|
+| id | BIGINT | PK | khóa |
+| code | VARCHAR(32) | **UNIQUE** | mã kho ổn định (như mã SKU) |
+| name | VARCHAR(255) | NOT NULL | tên hiển thị |
+| created_at | TIMESTAMPTZ | NOT NULL default now() | thời điểm tạo |
+
+**Vì sao:** mỗi kho có hệ tọa độ cục bộ riêng (dock quy ước ở gốc `(0,0,0)`), dữ liệu của kho nào bó trong kho đó. Migration V3 backfill dữ liệu cũ vào kho mặc định `MAIN`.
+
 ### `location` — khung không gian kho
 | Cột | Kiểu | Ràng buộc | Ý nghĩa |
 |---|---|---|---|
 | id | BIGINT | PK | khóa |
-| zone, aisle, rack, level, bin | VARCHAR(64) | **UNIQUE tổ hợp** | địa chỉ phân cấp (zone→aisle→rack→level→bin) |
+| warehouse_id | BIGINT | **FK → warehouse**, NOT NULL | thuộc kho nào (V3) |
+| zone, aisle, rack, level, bin | VARCHAR(64) | **UNIQUE tổ hợp cùng warehouse_id** | địa chỉ phân cấp (zone→aisle→rack→level→bin), duy nhất trong một kho |
 | x, y, z | NUMERIC(12,3) | NOT NULL | toạ độ **góc** của ô (để render 3D + tính blocking) |
 | w, d, h | NUMERIC(12,3) | NOT NULL | kích thước ô |
-| lane_id | VARCHAR(64) | NOT NULL, **INDEX** | định danh làn — blocking chỉ xét trong cùng lane |
+| lane_id | VARCHAR(64) | NOT NULL | định danh làn — blocking chỉ xét trong cùng (kho, lane) |
 | access_face | VARCHAR(16) | CHECK | mặt lấy hàng (hướng rút) |
 
-**Index:** `location(lane_id)` và `location(zone,aisle,rack)` — phục vụ truy vấn blocking *cục bộ theo lane* (không cần spatial index toàn cục, xem [ADR-0002](./adr/0002-backend-spring-boot.md)).
+**Index:** `location(warehouse_id, lane_id)` và `location(zone,aisle,rack)` — phục vụ truy vấn blocking *cục bộ theo lane trong một kho* (không cần spatial index toàn cục, xem [ADR-0009](./adr/0009-multi-warehouse.md)).
 
 **Vì sao tách x/y/z + w/d/h:** blocking cần đọc biên từng trục (`zMin = z`, `zMax = z+h`...). Lưu rời = đọc thẳng, không phải parse.
 
@@ -147,6 +159,7 @@ erDiagram
 |---|---|---|---|
 | id | BIGINT | PK | khóa |
 | lot_id | BIGINT | FK → lot | lô nào |
+| warehouse_id | BIGINT | **FK → warehouse**, NOT NULL | sự kiện xảy ra ở kho nào (V3); suy từ bin, bắt buộc khai khi cả hai bin null |
 | type | VARCHAR(16) | CHECK (5 loại) | INBOUND/PUTAWAY/RELOCATE/PICK/OUTBOUND |
 | from_bin | BIGINT | FK → location, nullable | từ ô (null nếu vào kho/staging) |
 | to_bin | BIGINT | FK → location, nullable | tới ô (null nếu rời kho) |
@@ -154,9 +167,11 @@ erDiagram
 | actor | VARCHAR(128) | nullable | ai thao tác |
 | scan_ref | VARCHAR(128) | nullable | tham chiếu scan/barcode |
 
-**Index:** `movement(lot_id, ts)` — phục vụ **replay** (đọc lịch sử 1 lô theo thứ tự thời gian) và dựng lại projection.
+**Index:** `movement(lot_id, ts)` — phục vụ **replay** (đọc lịch sử 1 lô theo thứ tự thời gian) và dựng lại projection; `movement(warehouse_id, ts)` — throughput báo cáo theo kho.
 
 **Vì sao from/to nullable:** INBOUND không có `from` (hàng từ ngoài); OUTBOUND không có `to` (hàng rời kho). Quy tắc chuyển trạng thái theo từng loại: xem [business.md §3](./business.md) và `PlacementProjectionService.apply`.
+
+**Luật một-kho-một-bút-toán (ADR-0009):** `from_bin` và `to_bin` phải cùng kho — `MovementService` từ chối movement xuyên kho, vì v1 chưa có nghiệp vụ transfer.
 
 ## Vòng đời dữ liệu (tóm tắt)
 

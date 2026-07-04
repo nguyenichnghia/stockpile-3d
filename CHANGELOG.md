@@ -7,6 +7,18 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Added
+- **Multi-warehouse (giai đoạn 4, ADR-0009)** — nhiều kho vật lý độc lập trong một CSDL, hoàn tất mục roadmap cuối cùng:
+  - Thực thể `Warehouse` (`code` UNIQUE, `name`) + Flyway `V3`: `location/movement/pick_order` mang `warehouse_id NOT NULL`; mã ô 5 đoạn giờ UNIQUE **trong một kho**; dữ liệu cũ backfill vào kho mặc định `MAIN` (chỉ tạo khi DB có dữ liệu). API `GET/POST /api/warehouses`.
+  - Generator theo kho: `POST /api/warehouses/{id}/generate` (thay `POST /api/warehouse/generate`); guard "đã có location" tính theo kho đích — tạo kho thứ hai là thao tác bình thường.
+  - Xem lại quyết định spatial index (docs/01 §6): **giữ nguyên, thu hẹp phạm vi** — blocking vẫn cục bộ theo lane, khóa phân vùng thành `(warehouse_id, lane_id)`, vẫn không PostGIS. Ba lõi thuần `BlockingGraph`/`PutawayScorer`/`RelocationPlanner` không đổi.
+  - Mọi API đọc nhận `warehouseId` (locations, placements, heatmap, scan, locate, reports, what-if, putaway-suggestion); relocation-plan/pick-plan suy kho từ dữ liệu. `LOT-{id}` vẫn toàn cục (ADR-0007 nguyên vẹn); mã ô resolve trong kho đang chọn.
+  - Ledger enforce "một kho một bút toán": movement có hai bin khác kho bị từ chối (chưa có transfer); movement không bin (INBOUND staging) phải khai `warehouseId`. Topic STOMP thành `/topic/warehouse/{id}/lane/{laneId}`.
+  - Frontend: bộ chọn kho qua `?wh=` trên `/` (link theo mã kho) và `/reports` (dropdown); pick-list chỉ hiện đơn của kho đang xem; subscription realtime theo kho. Test: 88/88 (6 test mới — scan phân biệt hai kho trùng mã ô, generate kho thứ hai, chặn movement xuyên kho, INBOUND staging bắt buộc khai kho, CRUD warehouse).
+
+### Changed
+- **Breaking:** các endpoint đọc yêu cầu `warehouseId`; đường generate đổi sang `/api/warehouses/{id}/generate`; topic STOMP đổi dạng — client cũ (trước v0.6.0) cần cập nhật. Frontend trong repo đã cập nhật cùng đợt.
+
 ## [0.6.0] - 2026-07-03
 Giai đoạn 4 (phần phân tích) — Reporting dashboard + What-if layout simulation.
 
