@@ -34,6 +34,14 @@ public class Movement {
 	@JoinColumn(name = "lot_id", nullable = false)
 	private Lot lot;
 
+	/**
+	 * Where the event happened. Derived from the bins when present; a movement
+	 * with no bins (INBOUND to staging) must state it explicitly (ADR-0009).
+	 */
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "warehouse_id", nullable = false)
+	private Warehouse warehouse;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	private MovementType type;

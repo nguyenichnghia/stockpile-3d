@@ -9,6 +9,7 @@ import com.stockpile.common.NotFoundException;
 import com.stockpile.inventory.domain.Location;
 import com.stockpile.inventory.dto.LocationDto;
 import com.stockpile.inventory.repository.LocationRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,10 +18,13 @@ import lombok.RequiredArgsConstructor;
 public class LocationService {
 
 	private final LocationRepository locationRepository;
+	private final WarehouseRepository warehouseRepository;
 
 	@Transactional(readOnly = true)
-	public List<LocationDto> findAll() {
-		return locationRepository.findAll().stream().map(LocationDto::from).toList();
+	public List<LocationDto> findAll(Long warehouseId) {
+		return locationRepository.findByWarehouseId(warehouseId).stream()
+				.map(LocationDto::from)
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -31,20 +35,26 @@ public class LocationService {
 	@Transactional
 	public LocationDto create(LocationDto dto) {
 		Location location = new Location();
-		dto.applyTo(location);
+		apply(dto, location);
 		return LocationDto.from(locationRepository.save(location));
 	}
 
 	@Transactional
 	public LocationDto update(Long id, LocationDto dto) {
 		Location location = get(id);
-		dto.applyTo(location);
+		apply(dto, location);
 		return LocationDto.from(locationRepository.save(location));
 	}
 
 	@Transactional
 	public void delete(Long id) {
 		locationRepository.delete(get(id));
+	}
+
+	private void apply(LocationDto dto, Location location) {
+		location.setWarehouse(warehouseRepository.findById(dto.warehouseId())
+				.orElseThrow(() -> new NotFoundException("Warehouse " + dto.warehouseId() + " not found")));
+		dto.applyTo(location);
 	}
 
 	private Location get(Long id) {

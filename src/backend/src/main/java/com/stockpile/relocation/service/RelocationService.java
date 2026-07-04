@@ -37,24 +37,29 @@ public class RelocationService {
 	public RelocationPlan plan(long lotId) {
 		Placement targetPlacement = placementRepository.findByLotId(lotId)
 				.orElseThrow(() -> new NotFoundException("No placement for lot " + lotId));
+		Long warehouseId = targetPlacement.getBin().getWarehouse().getId();
 		String laneId = targetPlacement.getBin().getLaneId();
 
 		// Build the in-memory lane state (lots currently placed in this lane).
 		List<LotBox> lane = new ArrayList<>(
-				placementRepository.findByBin_LaneId(laneId).stream().map(RelocationService::toBox).toList());
+				placementRepository.findByBin_WarehouseIdAndBin_LaneId(warehouseId, laneId).stream()
+						.map(RelocationService::toBox).toList());
 		LotBox target = lane.stream()
 				.filter(b -> b.lotId() == lotId)
 				.findFirst()
 				.orElseThrow(() -> new NotFoundException("Lot " + lotId + " not in lane " + laneId));
 
-		List<RelocationStep> steps = RelocationPlanner.plan(target, lane, emptySlots(laneId));
+		List<RelocationStep> steps = RelocationPlanner.plan(target, lane, emptySlots(warehouseId, laneId));
 		return new RelocationPlan(lotId, steps);
 	}
 
-	/** Empty candidate slots, same-lane first then anywhere, as pure EmptySlots. */
-	private List<EmptySlot> emptySlots(String laneId) {
-		List<Location> candidates = new ArrayList<>(locationRepository.findEmptyInLane(laneId));
-		candidates.addAll(locationRepository.findEmpty());
+	/**
+	 * Empty candidate slots, same-lane first then anywhere in the same warehouse
+	 * (ADR-0009: a relocation never moves a lot to another warehouse).
+	 */
+	private List<EmptySlot> emptySlots(Long warehouseId, String laneId) {
+		List<Location> candidates = new ArrayList<>(locationRepository.findEmptyInLane(warehouseId, laneId));
+		candidates.addAll(locationRepository.findEmptyInWarehouse(warehouseId));
 		return candidates.stream().map(RelocationService::toSlot).toList();
 	}
 

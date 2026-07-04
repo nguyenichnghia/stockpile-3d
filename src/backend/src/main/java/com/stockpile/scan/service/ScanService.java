@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.stockpile.inventory.domain.Location;
 import com.stockpile.inventory.domain.Lot;
-import com.stockpile.inventory.domain.Placement;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.PlacementRepository;
@@ -34,8 +33,13 @@ public class ScanService {
 	private final LocationRepository locationRepository;
 	private final PlacementRepository placementRepository;
 
+	/**
+	 * Bin codes are only unique per warehouse (ADR-0009), so resolving one needs
+	 * the caller's working warehouse. {@code LOT-{id}} stays global: lot ids are
+	 * global, and a scanned lot should be found even if it sits in another site.
+	 */
 	@Transactional(readOnly = true)
-	public ScanResult resolve(String rawCode) {
+	public ScanResult resolve(String rawCode, Long warehouseId) {
 		if (rawCode == null || rawCode.isBlank()) {
 			throw new IllegalArgumentException("scan code must not be blank");
 		}
@@ -47,7 +51,7 @@ public class ScanService {
 		}
 		String[] parts = code.split("-");
 		if (parts.length == 5) {
-			return resolveBin(code, parts);
+			return resolveBin(code, parts, warehouseId);
 		}
 		return ScanResult.notFound(code, ScanResult.Type.UNKNOWN);
 	}
@@ -71,9 +75,10 @@ public class ScanService {
 						lot.getId(), lot.getSku().getCode(), null, null, null));
 	}
 
-	private ScanResult resolveBin(String code, String[] parts) {
+	private ScanResult resolveBin(String code, String[] parts, Long warehouseId) {
 		return locationRepository
-				.findByZoneAndAisleAndRackAndLevelAndBin(parts[0], parts[1], parts[2], parts[3], parts[4])
+				.findByWarehouseIdAndZoneAndAisleAndRackAndLevelAndBin(
+						warehouseId, parts[0], parts[1], parts[2], parts[3], parts[4])
 				.map(bin -> ScanResult.bin(code, toBinInfo(bin)))
 				.orElseGet(() -> ScanResult.notFound(code, ScanResult.Type.BIN));
 	}

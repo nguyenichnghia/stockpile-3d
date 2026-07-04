@@ -19,9 +19,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.relocation.dto.RelocationPlan;
 import com.stockpile.relocation.service.RelocationService;
@@ -39,6 +41,9 @@ class RelocationServiceTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void freeLotHasEmptyPlan() {
@@ -68,6 +73,17 @@ class RelocationServiceTest {
 
 	// --- helpers ---
 
+	/** One warehouse per test instance (bin codes stay unique via nanoTime). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
+
 	private Sku sku() {
 		Sku s = new Sku();
 		s.setCode("S-" + System.nanoTime());
@@ -82,6 +98,7 @@ class RelocationServiceTest {
 
 	private Location bin(String lane, double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");

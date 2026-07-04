@@ -48,6 +48,7 @@ public class PickingService {
 	@Transactional(readOnly = true)
 	public PickPlan plan(long orderId) {
 		PickOrder order = orderService.get(orderId);
+		Long warehouseId = order.getWarehouse().getId();
 
 		List<PickLineResult> lineResults = new ArrayList<>();
 		List<PickStep> steps = new ArrayList<>();
@@ -57,9 +58,11 @@ public class PickingService {
 
 		for (OrderLine line : order.getLines()) {
 			String skuCode = line.getSku().getCode();
-			List<Placement> placements = placementRepository.findByLot_Sku_CodeIgnoreCase(skuCode);
+			// Only stock in the order's warehouse is eligible (ADR-0009).
+			List<Placement> placements = placementRepository
+					.findByBin_WarehouseIdAndLot_Sku_CodeIgnoreCase(warehouseId, skuCode);
 
-			List<Candidate> candidates = toCandidates(placements, blockersByLot);
+			List<Candidate> candidates = toCandidates(warehouseId, placements, blockersByLot);
 			List<Candidate> chosen = PickPlanner.select(candidates, line.getSku().getHandling(), line.getQty());
 
 			for (Candidate c : chosen) {
@@ -86,11 +89,12 @@ public class PickingService {
 	 * blocker count from its lane. {@code blockersByLot} caches per-lane work
 	 * across lines that share lanes.
 	 */
-	private List<Candidate> toCandidates(List<Placement> placements, Map<Long, Integer> blockersByLot) {
+	private List<Candidate> toCandidates(Long warehouseId, List<Placement> placements,
+			Map<Long, Integer> blockersByLot) {
 		List<Candidate> candidates = new ArrayList<>();
 		for (Placement p : placements) {
 			int blockers = blockersByLot.computeIfAbsent(
-					p.getLot().getId(), lotId -> countBlockers(lotId, p.getBin().getLaneId()));
+					p.getLot().getId(), lotId -> countBlockers(lotId, warehouseId, p.getBin().getLaneId()));
 			candidates.add(new Candidate(
 					p.getLot().getId(),
 					p.getBin().getId(),
@@ -102,8 +106,8 @@ public class PickingService {
 	}
 
 	/** How many lots block the given lot within its lane (pure BlockingGraph). */
-	private int countBlockers(long lotId, String laneId) {
-		List<LotBox> lane = placementRepository.findByBin_LaneId(laneId).stream()
+	private int countBlockers(long lotId, Long warehouseId, String laneId) {
+		List<LotBox> lane = placementRepository.findByBin_WarehouseIdAndBin_LaneId(warehouseId, laneId).stream()
 				.map(PickingService::toBox)
 				.toList();
 		LotBox target = lane.stream().filter(b -> b.lotId() == lotId).findFirst().orElse(null);

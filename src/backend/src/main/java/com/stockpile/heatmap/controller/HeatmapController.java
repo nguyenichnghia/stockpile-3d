@@ -20,7 +20,8 @@ public class HeatmapController {
 	private final HeatmapService heatmapService;
 
 	@GetMapping("/api/heatmap")
-	public HeatmapResult heatmap(@RequestParam(defaultValue = "fill") String metric) {
-		return heatmapService.compute(metric);
+	public HeatmapResult heatmap(
+			@RequestParam(defaultValue = "fill") String metric, @RequestParam Long warehouseId) {
+		return heatmapService.compute(metric, warehouseId);
 	}
 }

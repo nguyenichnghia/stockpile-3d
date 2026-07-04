@@ -21,7 +21,7 @@ public class ScanController {
 	private final ScanService scanService;
 
 	@GetMapping("/api/scan")
-	public ScanResult resolve(@RequestParam String code) {
-		return scanService.resolve(code);
+	public ScanResult resolve(@RequestParam String code, @RequestParam Long warehouseId) {
+		return scanService.resolve(code, warehouseId);
 	}
 }

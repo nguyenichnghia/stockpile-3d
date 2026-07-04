@@ -21,9 +21,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.scan.dto.ScanResult;
 import com.stockpile.scan.service.ScanService;
@@ -42,13 +44,16 @@ class ScanServiceTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void resolvesAPlacedLotWithItsBin() {
 		Location bin = binWithCode("A", "01", "00", "1", "01");
 		Lot lot = putaway(sku("SHIRT"), bin);
 
-		ScanResult result = scanService.resolve("LOT-" + lot.getId());
+		ScanResult result = scanService.resolve("LOT-" + lot.getId(), warehouse().getId());
 
 		assertThat(result.type()).isEqualTo(ScanResult.Type.LOT);
 		assertThat(result.found()).isTrue();
@@ -62,7 +67,7 @@ class ScanServiceTest {
 	void resolvesAnUnplacedLotWithoutABin() {
 		Lot lot = lot(sku("SHIRT")); // exists, but never put away
 
-		ScanResult result = scanService.resolve("lot-" + lot.getId()); // case-insensitive
+		ScanResult result = scanService.resolve("lot-" + lot.getId(), warehouse().getId()); // case-insensitive
 
 		assertThat(result.found()).isTrue();
 		assertThat(result.lot().binId()).isNull();
@@ -70,7 +75,7 @@ class ScanServiceTest {
 
 	@Test
 	void unknownLotIdKeepsTypeButIsNotFound() {
-		ScanResult result = scanService.resolve("LOT-999999");
+		ScanResult result = scanService.resolve("LOT-999999", warehouse().getId());
 
 		assertThat(result.type()).isEqualTo(ScanResult.Type.LOT);
 		assertThat(result.found()).isFalse();
@@ -82,7 +87,7 @@ class ScanServiceTest {
 		Location bin = binWithCode("A", "01", "00", "1", "01");
 		Lot lot = putaway(sku("SHIRT"), bin);
 
-		ScanResult result = scanService.resolve(" A-01-00-1-01 "); // trimmed
+		ScanResult result = scanService.resolve(" A-01-00-1-01 ", warehouse().getId()); // trimmed
 
 		assertThat(result.type()).isEqualTo(ScanResult.Type.BIN);
 		assertThat(result.found()).isTrue();
@@ -94,7 +99,7 @@ class ScanServiceTest {
 	void resolvesAnEmptyBinWithNoLots() {
 		binWithCode("A", "01", "00", "1", "01");
 
-		ScanResult result = scanService.resolve("A-01-00-1-01");
+		ScanResult result = scanService.resolve("A-01-00-1-01", warehouse().getId());
 
 		assertThat(result.found()).isTrue();
 		assertThat(result.bin().lotIds()).isEmpty();
@@ -102,26 +107,57 @@ class ScanServiceTest {
 
 	@Test
 	void unknownBinCodeKeepsTypeButIsNotFound() {
-		ScanResult result = scanService.resolve("Z-99-99-9-99");
+		ScanResult result = scanService.resolve("Z-99-99-9-99", warehouse().getId());
 
 		assertThat(result.type()).isEqualTo(ScanResult.Type.BIN);
 		assertThat(result.found()).isFalse();
 	}
 
 	@Test
+	void binCodeResolvesWithinTheSelectedWarehouse() {
+		// The same 5-segment code may exist in two warehouses (ADR-0009): the
+		// scan must resolve to the bin of the warehouse the caller works in.
+		Location mine = binWithCode("A", "01", "00", "1", "01");
+		Warehouse other = newWarehouse();
+		Location theirs = binInWarehouse(other, "A", "01", "00", "1", "01");
+
+		ScanResult result = scanService.resolve("A-01-00-1-01", warehouse().getId());
+		ScanResult otherResult = scanService.resolve("A-01-00-1-01", other.getId());
+
+		assertThat(result.bin().id()).isEqualTo(mine.getId());
+		assertThat(otherResult.bin().id()).isEqualTo(theirs.getId());
+	}
+
+	@Test
 	void unrecognizedShapeIsUnknown() {
-		assertThat(scanService.resolve("HELLO").type()).isEqualTo(ScanResult.Type.UNKNOWN);
-		assertThat(scanService.resolve("LOT-abc").type()).isEqualTo(ScanResult.Type.UNKNOWN);
-		assertThat(scanService.resolve("A-01-00").type()).isEqualTo(ScanResult.Type.UNKNOWN);
+		Long whId = warehouse().getId();
+		assertThat(scanService.resolve("HELLO", whId).type()).isEqualTo(ScanResult.Type.UNKNOWN);
+		assertThat(scanService.resolve("LOT-abc", whId).type()).isEqualTo(ScanResult.Type.UNKNOWN);
+		assertThat(scanService.resolve("A-01-00", whId).type()).isEqualTo(ScanResult.Type.UNKNOWN);
 	}
 
 	@Test
 	void blankCodeIsRejected() {
-		assertThatThrownBy(() -> scanService.resolve("  "))
+		assertThatThrownBy(() -> scanService.resolve("  ", warehouse().getId()))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	// --- helpers (same shapes as LocateServiceTest) ---
+
+	/** The default test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			wh = newWarehouse();
+		}
+		return wh;
+	}
+
+	private Warehouse newWarehouse() {
+		Warehouse w = new Warehouse();
+		w.setCode("WH-" + System.nanoTime());
+		w.setName("Test warehouse");
+		return warehouseRepository.save(w);
+	}
 
 	private Sku sku(String code) {
 		Sku s = new Sku();
@@ -136,7 +172,13 @@ class ScanServiceTest {
 	}
 
 	private Location binWithCode(String zone, String aisle, String rack, String level, String bin) {
+		return binInWarehouse(warehouse(), zone, aisle, rack, level, bin);
+	}
+
+	private Location binInWarehouse(Warehouse warehouse,
+			String zone, String aisle, String rack, String level, String bin) {
 		Location l = new Location();
+		l.setWarehouse(warehouse);
 		l.setZone(zone);
 		l.setAisle(aisle);
 		l.setRack(rack);

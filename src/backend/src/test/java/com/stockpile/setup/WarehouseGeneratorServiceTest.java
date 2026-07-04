@@ -17,7 +17,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.stockpile.inventory.domain.AccessFace;
 import com.stockpile.inventory.domain.Location;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.relocation.service.BlockingGraph;
 import com.stockpile.relocation.service.LotBox;
 import com.stockpile.setup.dto.WarehouseGenerationResult;
@@ -35,6 +37,9 @@ class WarehouseGeneratorServiceTest {
 
 	@Autowired WarehouseGeneratorService generatorService;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	private static WarehouseGridSpec spec(int zones, int aisles, int racks, int levels, int bins) {
 		return new WarehouseGridSpec(zones, aisles, racks, levels, bins,
@@ -42,9 +47,24 @@ class WarehouseGeneratorServiceTest {
 				new BigDecimal("2.0"), AccessFace.SOUTH);
 	}
 
+	/** The default test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			wh = newWarehouse();
+		}
+		return wh;
+	}
+
+	private Warehouse newWarehouse() {
+		Warehouse w = new Warehouse();
+		w.setCode("WH-" + System.nanoTime());
+		w.setName("Test warehouse");
+		return warehouseRepository.save(w);
+	}
+
 	@Test
 	void createsProductOfCountsSlots() {
-		WarehouseGenerationResult result = generatorService.generate(spec(2, 3, 4, 2, 3));
+		WarehouseGenerationResult result = generatorService.generate(warehouse().getId(), spec(2, 3, 4, 2, 3));
 
 		assertThat(result.locationsCreated()).isEqualTo(2 * 3 * 4 * 2 * 3);
 		assertThat(locationRepository.count()).isEqualTo(2L * 3 * 4 * 2 * 3);
@@ -52,18 +72,31 @@ class WarehouseGeneratorServiceTest {
 
 	@Test
 	void refusesWhenWarehouseNotEmpty() {
-		generatorService.generate(spec(1, 1, 1, 1, 1));
+		generatorService.generate(warehouse().getId(), spec(1, 1, 1, 1, 1));
 
-		assertThatThrownBy(() -> generatorService.generate(spec(1, 1, 1, 1, 1)))
+		assertThatThrownBy(() -> generatorService.generate(warehouse().getId(), spec(1, 1, 1, 1, 1)))
 				.isInstanceOf(IllegalStateException.class)
 				.hasMessageContaining("already has locations");
+	}
+
+	@Test
+	void generatesASecondWarehouseIndependently() {
+		// The emptiness guard is per warehouse (ADR-0009): a populated first
+		// warehouse must not stop a second, empty one from being generated.
+		generatorService.generate(warehouse().getId(), spec(1, 1, 1, 1, 1));
+		Warehouse second = newWarehouse();
+
+		generatorService.generate(second.getId(), spec(1, 1, 2, 1, 1));
+
+		assertThat(locationRepository.countByWarehouseId(warehouse().getId())).isEqualTo(1);
+		assertThat(locationRepository.countByWarehouseId(second.getId())).isEqualTo(2);
 	}
 
 	@Test
 	void singleLevelGridHasNoBlocking() {
 		// One level => footprints are laid out side by side on the floor, so no
 		// slot should block any other (bins/racks/aisles are disjoint in x/y).
-		generatorService.generate(spec(2, 2, 3, 1, 2));
+		generatorService.generate(warehouse().getId(), spec(2, 2, 3, 1, 2));
 
 		List<LotBox> boxes = locationRepository.findAll().stream()
 				.map(WarehouseGeneratorServiceTest::box)
@@ -81,7 +114,7 @@ class WarehouseGeneratorServiceTest {
 		// Multiple levels share an (x,y) footprint stacked along z. In this
 		// block-stacking model the upper level blocks the lower one (you must
 		// move the top to reach the bottom) — see BlockingGraph.blocksOnTop.
-		generatorService.generate(spec(1, 1, 1, 2, 1));
+		generatorService.generate(warehouse().getId(), spec(1, 1, 1, 2, 1));
 
 		List<LotBox> boxes = locationRepository.findAll().stream()
 				.map(WarehouseGeneratorServiceTest::box)
@@ -96,7 +129,7 @@ class WarehouseGeneratorServiceTest {
 
 	@Test
 	void levelsStackAlongZ() {
-		generatorService.generate(spec(1, 1, 1, 3, 1));
+		generatorService.generate(warehouse().getId(), spec(1, 1, 1, 3, 1));
 
 		List<Location> byLevel = locationRepository.findAll().stream()
 				.sorted((p, q) -> p.getLevel().compareTo(q.getLevel()))

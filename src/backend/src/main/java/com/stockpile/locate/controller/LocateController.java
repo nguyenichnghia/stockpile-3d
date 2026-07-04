@@ -21,12 +21,12 @@ public class LocateController {
 	private final LocateService locateService;
 
 	@GetMapping("/api/lots/locate")
-	public LocateResult locate(@RequestParam String sku) {
-		return locateService.locateBySku(sku);
+	public LocateResult locate(@RequestParam String sku, @RequestParam Long warehouseId) {
+		return locateService.locateBySku(sku, warehouseId);
 	}
 
 	@GetMapping("/api/locations/locate")
-	public BinLocateResult locateBin(@RequestParam String code) {
-		return locateService.locateByBinCode(code);
+	public BinLocateResult locateBin(@RequestParam String code, @RequestParam Long warehouseId) {
+		return locateService.locateByBinCode(code, warehouseId);
 	}
 }

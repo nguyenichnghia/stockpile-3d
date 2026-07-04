@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.stockpile.inventory.dto.PlacementDto;
@@ -23,7 +24,9 @@ public class PlacementController {
 	private final PlacementRepository placementRepository;
 
 	@GetMapping
-	public List<PlacementDto> list() {
-		return placementRepository.findAll().stream().map(PlacementDto::from).toList();
+	public List<PlacementDto> list(@RequestParam Long warehouseId) {
+		return placementRepository.findByBin_WarehouseId(warehouseId).stream()
+				.map(PlacementDto::from)
+				.toList();
 	}
 }

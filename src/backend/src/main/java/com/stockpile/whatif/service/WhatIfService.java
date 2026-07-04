@@ -49,14 +49,14 @@ public class WhatIfService {
 	private final PutawayWeights weights;
 
 	@Transactional(readOnly = true)
-	public WhatIfResult simulate(WarehouseGridSpec spec) {
+	public WhatIfResult simulate(Long warehouseId, WarehouseGridSpec spec) {
 		if (spec.totalSlots() > MAX_SLOTS) {
 			throw new IllegalArgumentException(
 					"Simulated grid has " + spec.totalSlots() + " slots; the cap is " + MAX_SLOTS);
 		}
 
-		List<Placement> placements = placementRepository.findAll();
-		LayoutMetrics current = measureCurrent(placements);
+		List<Placement> placements = placementRepository.findByBin_WarehouseId(warehouseId);
+		LayoutMetrics current = measureCurrent(warehouseId, placements);
 
 		// The hypothetical layout. Ids are synthetic (the entities are never
 		// persisted); LotBox and the scorer need them to tell bins apart.
@@ -70,13 +70,13 @@ public class WhatIfService {
 	}
 
 	/** Metrics of the warehouse as it physically stands. */
-	private LayoutMetrics measureCurrent(List<Placement> placements) {
+	private LayoutMetrics measureCurrent(Long warehouseId, List<Placement> placements) {
 		List<LotBox> boxes = placements.stream().map(WhatIfService::toBox).toList();
 		double avgDist = placements.stream()
 				.mapToDouble(p -> dist(p.getBin()))
 				.average()
 				.orElse(0.0);
-		long bins = locationRepository.count();
+		long bins = locationRepository.countByWarehouseId(warehouseId);
 		return new LayoutMetrics(
 				bins,
 				placements.size(),

@@ -24,9 +24,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.picking.domain.PickOrder;
 import com.stockpile.picking.repository.PickOrderRepository;
@@ -49,10 +51,13 @@ class ReportingServiceTest {
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
 	@Autowired PickOrderRepository pickOrderRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void emptyWarehouseSummarizesToZeros() {
-		ReportSummary s = reportingService.summary();
+		ReportSummary s = reportingService.summary(warehouse().getId());
 
 		assertThat(s.totalBins()).isZero();
 		assertThat(s.fillRate()).isZero();
@@ -77,9 +82,10 @@ class ReportingServiceTest {
 
 		PickOrder order = new PickOrder();
 		order.setCode("ORD-R");
+		order.setWarehouse(warehouse());
 		pickOrderRepository.save(order);
 
-		ReportSummary s = reportingService.summary();
+		ReportSummary s = reportingService.summary(warehouse().getId());
 
 		assertThat(s.totalBins()).isEqualTo(3);
 		assertThat(s.occupiedBins()).isEqualTo(2);
@@ -100,7 +106,7 @@ class ReportingServiceTest {
 		Lot lot = putaway(lot(sku, null), a);
 		relocate(lot, a, b);
 
-		List<MovementDaily> rows = reportingService.movementsDaily(7);
+		List<MovementDaily> rows = reportingService.movementsDaily(7, warehouse().getId());
 
 		LocalDate today = LocalDate.now(ZoneOffset.UTC);
 		assertThat(rows).containsExactlyInAnyOrder(
@@ -110,13 +116,24 @@ class ReportingServiceTest {
 
 	@Test
 	void movementsDailyRejectsAnOutOfRangeWindow() {
-		assertThatThrownBy(() -> reportingService.movementsDaily(0))
+		assertThatThrownBy(() -> reportingService.movementsDaily(0, warehouse().getId()))
 				.isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> reportingService.movementsDaily(91))
+		assertThatThrownBy(() -> reportingService.movementsDaily(91, warehouse().getId()))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	// --- helpers (same shapes as the other service tests) ---
+
+	/** The single test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
 
 	private Sku sku(String code) {
 		Sku s = new Sku();
@@ -133,6 +150,7 @@ class ReportingServiceTest {
 	/** A 1×1×1 bin at (x,y,z) in the given lane; bin code kept unique. */
 	private Location bin(String lane, double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack(lane);

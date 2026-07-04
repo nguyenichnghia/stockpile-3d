@@ -22,12 +22,13 @@ public class ReportingController {
 	private final ReportingService reportingService;
 
 	@GetMapping("/summary")
-	public ReportSummary summary() {
-		return reportingService.summary();
+	public ReportSummary summary(@RequestParam Long warehouseId) {
+		return reportingService.summary(warehouseId);
 	}
 
 	@GetMapping("/movements")
-	public List<MovementDaily> movements(@RequestParam(required = false) Integer days) {
-		return reportingService.movementsDaily(days);
+	public List<MovementDaily> movements(
+			@RequestParam(required = false) Integer days, @RequestParam Long warehouseId) {
+		return reportingService.movementsDaily(days, warehouseId);
 	}
 }

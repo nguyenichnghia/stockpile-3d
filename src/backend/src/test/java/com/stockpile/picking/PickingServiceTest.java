@@ -21,9 +21,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.picking.domain.OrderLine;
 import com.stockpile.picking.domain.PickOrder;
@@ -48,6 +50,9 @@ class PickingServiceTest {
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
 	@Autowired PickOrderRepository orderRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void accessibleLotYieldsASinglePickStep() {
@@ -107,6 +112,17 @@ class PickingServiceTest {
 
 	// --- helpers ---
 
+	/** The single test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
+
 	private Sku sku(HandlingType handling) {
 		Sku s = new Sku();
 		s.setCode("S-" + System.nanoTime());
@@ -121,6 +137,7 @@ class PickingServiceTest {
 
 	private Location bin(String lane, double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");
@@ -158,6 +175,7 @@ class PickingServiceTest {
 	private PickOrder order(Sku sku, int qty) {
 		PickOrder o = new PickOrder();
 		o.setCode("O-" + System.nanoTime());
+		o.setWarehouse(warehouse());
 		OrderLine line = new OrderLine();
 		line.setSku(sku);
 		line.setQty(qty);

@@ -33,25 +33,29 @@ public class PlacementBroadcaster {
 
 		if (removed) {
 			// Lot left its bin: tell the origin lane to drop it.
-			send(e.fromLaneId(), PlacementDelta.remove(e.lotId(), e.ts()));
+			send(e.warehouseId(), e.fromLaneId(), PlacementDelta.remove(e.lotId(), e.ts()));
 			return;
 		}
 
 		// Lot now sits at the destination bin: add/replace it there.
-		send(e.toLaneId(),
+		send(e.warehouseId(), e.toLaneId(),
 				PlacementDelta.upsert(e.lotId(), e.toBinId(), e.toX(), e.toY(), e.toZ(), e.ts()));
 
 		// Relocate across lanes: the origin lane must also drop the lot, or it
 		// would keep showing it. (Same-lane relocate: the UPSERT above suffices.)
 		if (laneChanged) {
-			send(e.fromLaneId(), PlacementDelta.remove(e.lotId(), e.ts()));
+			send(e.warehouseId(), e.fromLaneId(), PlacementDelta.remove(e.lotId(), e.ts()));
 		}
 	}
 
-	private void send(String laneId, PlacementDelta delta) {
+	/**
+	 * Lane topics are warehouse-qualified (ADR-0009): two warehouses may use the
+	 * same lane id without hearing each other's deltas.
+	 */
+	private void send(Long warehouseId, String laneId, PlacementDelta delta) {
 		if (laneId == null) {
 			return;
 		}
-		messaging.convertAndSend("/topic/lane/" + laneId, delta);
+		messaging.convertAndSend("/topic/warehouse/" + warehouseId + "/lane/" + laneId, delta);
 	}
 }

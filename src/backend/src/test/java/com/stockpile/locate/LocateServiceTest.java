@@ -21,9 +21,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.locate.dto.BinLocateResult;
 import com.stockpile.locate.dto.LocateResult;
@@ -43,6 +45,9 @@ class LocateServiceTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void findsEveryLotOfTheSku() {
@@ -52,7 +57,7 @@ class LocateServiceTest {
 		putaway(shirt, bin(5, 0, 0));
 		putaway(sku("PANTS"), bin(9, 0, 0));
 
-		LocateResult result = locateService.locateBySku("SHIRT");
+		LocateResult result = locateService.locateBySku("SHIRT", warehouse().getId());
 
 		assertThat(result.sku()).isEqualTo("SHIRT");
 		assertThat(result.matchCount()).isEqualTo(2);
@@ -63,28 +68,28 @@ class LocateServiceTest {
 	void matchIsCaseInsensitiveAndTrimmed() {
 		putaway(sku("SHIRT"), bin(0, 0, 0));
 
-		assertThat(locateService.locateBySku("  shirt  ").matchCount()).isEqualTo(1);
+		assertThat(locateService.locateBySku("  shirt  ", warehouse().getId()).matchCount()).isEqualTo(1);
 	}
 
 	@Test
 	void unknownSkuReturnsNoMatches() {
 		putaway(sku("SHIRT"), bin(0, 0, 0));
 
-		LocateResult result = locateService.locateBySku("NOPE");
+		LocateResult result = locateService.locateBySku("NOPE", warehouse().getId());
 		assertThat(result.matchCount()).isZero();
 		assertThat(result.matches()).isEmpty();
 	}
 
 	@Test
 	void blankSkuIsRejected() {
-		assertThatThrownBy(() -> locateService.locateBySku("  "))
+		assertThatThrownBy(() -> locateService.locateBySku("  ", warehouse().getId()))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void locatesAnEmptyBinByItsCode() {
 		Location loc = binWithCode("A", "01", "00", "1", "01"); // empty, no lot
-		BinLocateResult result = locateService.locateByBinCode("A-01-00-1-01");
+		BinLocateResult result = locateService.locateByBinCode("A-01-00-1-01", warehouse().getId());
 
 		assertThat(result.found()).isTrue();
 		assertThat(result.binId()).isEqualTo(loc.getId());
@@ -93,16 +98,27 @@ class LocateServiceTest {
 	@Test
 	void unknownBinCodeIsNotFound() {
 		binWithCode("A", "01", "00", "1", "01");
-		assertThat(locateService.locateByBinCode("Z-99-99-9-99").found()).isFalse();
+		assertThat(locateService.locateByBinCode("Z-99-99-9-99", warehouse().getId()).found()).isFalse();
 	}
 
 	@Test
 	void malformedBinCodeIsRejected() {
-		assertThatThrownBy(() -> locateService.locateByBinCode("A-01-00"))
+		assertThatThrownBy(() -> locateService.locateByBinCode("A-01-00", warehouse().getId()))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	// --- helpers ---
+
+	/** The single test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
 
 	private Sku sku(String code) {
 		Sku s = new Sku();
@@ -118,6 +134,7 @@ class LocateServiceTest {
 
 	private Location bin(double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");
@@ -137,6 +154,7 @@ class LocateServiceTest {
 	/** A bin with explicit code parts, so it can be located by "zone-aisle-rack-level-bin". */
 	private Location binWithCode(String zone, String aisle, String rack, String level, String bin) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone(zone);
 		l.setAisle(aisle);
 		l.setRack(rack);

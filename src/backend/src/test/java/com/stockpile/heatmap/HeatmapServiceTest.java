@@ -27,9 +27,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 
 @SpringBootTest
@@ -46,6 +48,9 @@ class HeatmapServiceTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void fillIsOneForOccupiedZeroForEmpty() {
@@ -53,7 +58,7 @@ class HeatmapServiceTest {
 		Location empty = bin(3);
 		putaway(occupied);
 
-		Map<Long, Double> byBin = values(heatmapService.compute("fill"));
+		Map<Long, Double> byBin = values(heatmapService.compute("fill", warehouse().getId()));
 
 		assertThat(byBin.get(occupied.getId())).isEqualTo(1.0);
 		assertThat(byBin.get(empty.getId())).isEqualTo(0.0);
@@ -65,7 +70,7 @@ class HeatmapServiceTest {
 		bin(3);
 		bin(6);
 
-		HeatmapResult result = heatmapService.compute("fill");
+		HeatmapResult result = heatmapService.compute("fill", warehouse().getId());
 
 		assertThat(result.metric()).isEqualTo("fill");
 		assertThat(result.cells()).hasSize(3);
@@ -73,7 +78,7 @@ class HeatmapServiceTest {
 
 	@Test
 	void unknownMetricIsRejected() {
-		assertThatThrownBy(() -> heatmapService.compute("nope"))
+		assertThatThrownBy(() -> heatmapService.compute("nope", warehouse().getId()))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -85,7 +90,7 @@ class HeatmapServiceTest {
 		putaway(bottom);
 		putaway(top);
 
-		Map<Long, Double> byBin = values(heatmapService.compute("blocking"));
+		Map<Long, Double> byBin = values(heatmapService.compute("blocking", warehouse().getId()));
 
 		// bottom has 1 blocker -> 1/CAP(3) > 0; top has none -> 0.
 		assertThat(byBin.get(bottom.getId())).isGreaterThan(0.0);
@@ -96,7 +101,7 @@ class HeatmapServiceTest {
 	void blockingIsZeroForEmptyBin() {
 		Location empty = binAt("lane-e", 5, 5, 0);
 
-		Map<Long, Double> byBin = values(heatmapService.compute("blocking"));
+		Map<Long, Double> byBin = values(heatmapService.compute("blocking", warehouse().getId()));
 
 		assertThat(byBin.get(empty.getId())).isEqualTo(0.0);
 	}
@@ -107,7 +112,7 @@ class HeatmapServiceTest {
 		Location empty = binAt("lane-y", 5, 5, 0);
 		putawayExpiring(expiring, LocalDate.now()); // expires today -> fully hot
 
-		Map<Long, Double> byBin = values(heatmapService.compute("expiry"));
+		Map<Long, Double> byBin = values(heatmapService.compute("expiry", warehouse().getId()));
 
 		assertThat(byBin.get(expiring.getId())).isEqualTo(1.0);
 		assertThat(byBin.get(empty.getId())).isEqualTo(0.0);
@@ -119,6 +124,17 @@ class HeatmapServiceTest {
 
 	// --- helpers ---
 
+	/** The single test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
+
 	/** A bin in its own lane at (x,0,0) — for fill tests where lanes don't matter. */
 	private Location bin(double x) {
 		return binAt("lane-" + System.nanoTime(), x, 0, 0);
@@ -127,6 +143,7 @@ class HeatmapServiceTest {
 	/** A bin in a given lane at (x,y,z) — for blocking tests that stack lots. */
 	private Location binAt(String lane, double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");

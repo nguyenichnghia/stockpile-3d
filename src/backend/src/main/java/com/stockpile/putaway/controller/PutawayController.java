@@ -20,7 +20,7 @@ public class PutawayController {
 	private final PutawayService putawayService;
 
 	@GetMapping("/api/putaway-suggestion")
-	public PutawaySuggestion suggest(@RequestParam long lotId) {
-		return putawayService.suggest(lotId);
+	public PutawaySuggestion suggest(@RequestParam long lotId, @RequestParam long warehouseId) {
+		return putawayService.suggest(lotId, warehouseId);
 	}
 }
