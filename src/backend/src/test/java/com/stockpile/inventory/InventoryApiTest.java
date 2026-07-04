@@ -34,8 +34,9 @@ class InventoryApiTest {
 
 	@Test
 	void fullFlowPutawayThenPlacementVisible() throws Exception {
+		long warehouseId = createWarehouse();
 		long skuId = createSku("SKU-FLOW");
-		long binId = createLocation("FLOW-BIN");
+		long binId = createLocation(warehouseId, "FLOW-BIN");
 		long lotId = createLot(skuId);
 
 		// record a PUTAWAY into the bin
@@ -45,9 +46,31 @@ class InventoryApiTest {
 				.andExpect(status().isCreated());
 
 		// placement projection now shows the lot in that bin
-		mvc.perform(get("/api/placements"))
+		mvc.perform(get("/api/placements").param("warehouseId", String.valueOf(warehouseId)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[?(@.lotId==" + lotId + " && @.binId==" + binId + ")]").exists());
+	}
+
+	@Test
+	void warehousesCanBeCreatedAndListed() throws Exception {
+		long id = createWarehouse();
+
+		mvc.perform(get("/api/warehouses"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[?(@.id==" + id + ")]").exists());
+		mvc.perform(get("/api/warehouses/" + id))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("Test warehouse"));
+	}
+
+	@Test
+	void duplicateWarehouseCodeReturns400() throws Exception {
+		String body = """
+				{"code":"WH-DUP","name":"Test warehouse"}""";
+		mvc.perform(post("/api/warehouses").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isCreated());
+		mvc.perform(post("/api/warehouses").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isBadRequest());
 	}
 
 	@Test
@@ -72,6 +95,15 @@ class InventoryApiTest {
 
 	// --- helpers ---
 
+	private long createWarehouse() throws Exception {
+		String body = """
+				{"code":"WH-%s","name":"Test warehouse"}""".formatted(System.nanoTime());
+		String res = mvc.perform(post("/api/warehouses").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		return id(res);
+	}
+
 	private long createSku(String code) throws Exception {
 		String body = """
 				{"code":"%s","name":"test","w":1,"d":1,"h":1,"weight":1,"handling":"FIFO"}"""
@@ -82,11 +114,11 @@ class InventoryApiTest {
 		return id(res);
 	}
 
-	private long createLocation(String bin) throws Exception {
+	private long createLocation(long warehouseId, String bin) throws Exception {
 		String body = """
-				{"zone":"Z","aisle":"A","rack":"R","level":"1","bin":"%s",\
+				{"warehouseId":%d,"zone":"Z","aisle":"A","rack":"R","level":"1","bin":"%s",\
 				"x":0,"y":0,"z":0,"w":1,"d":1,"h":1,"laneId":"lane-1","accessFace":"NORTH"}"""
-				.formatted(bin);
+				.formatted(warehouseId, bin);
 		String res = mvc.perform(post("/api/locations").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();

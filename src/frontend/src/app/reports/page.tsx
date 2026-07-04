@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   fetchMovementsDaily,
   fetchReportSummary,
+  fetchWarehouses,
   simulateLayout,
   type MovementDaily,
   type ReportSummary,
+  type Warehouse,
   type WhatIfResult,
 } from "@/lib/api";
 
@@ -52,19 +55,48 @@ const CRITICAL = "#d03b3b";
 
 const DAYS = 14;
 
-export default function ReportsPage() {
-  const [summary, setSummary] = useState<ReportSummary | null>(null);
-  const [rows, setRows] = useState<MovementDaily[] | null>(null);
+/** useSearchParams needs a Suspense boundary during prerender. */
+export default function ReportsPageShell() {
+  return (
+    <Suspense fallback={null}>
+      <ReportsPage />
+    </Suspense>
+  );
+}
+
+function ReportsPage() {
+  const router = useRouter();
+  const whParam = Number(useSearchParams().get("wh"));
+  const [warehouses, setWarehouses] = useState<Warehouse[] | null>(null);
+  // Report data tagged with its warehouse: stale data for another warehouse is
+  // simply not shown, so switching needs no reset and late responses can't win.
+  const [data, setData] = useState<{
+    whId: number;
+    summary: ReportSummary;
+    rows: MovementDaily[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The working warehouse: the ?wh= param when valid, else the first one.
+  const selected =
+    warehouses?.find((w) => w.id === whParam) ?? warehouses?.[0] ?? null;
+  const selectedId = selected?.id;
+
   useEffect(() => {
-    Promise.all([fetchReportSummary(), fetchMovementsDaily(DAYS)])
-      .then(([s, m]) => {
-        setSummary(s);
-        setRows(m);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải báo cáo"));
+    fetchWarehouses()
+      .then(setWarehouses)
+      .catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải danh sách kho"));
   }, []);
+
+  useEffect(() => {
+    if (selectedId == null) return;
+    Promise.all([fetchReportSummary(selectedId), fetchMovementsDaily(DAYS, selectedId)])
+      .then(([s, m]) => setData({ whId: selectedId, summary: s, rows: m }))
+      .catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải báo cáo"));
+  }, [selectedId]);
+
+  const summary = data && data.whId === selectedId ? data.summary : null;
+  const rows = data && data.whId === selectedId ? data.rows : null;
 
   return (
     <main
@@ -78,13 +110,36 @@ export default function ReportsPage() {
     >
       <header style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 20 }}>Báo cáo kho</h1>
-        <Link href="/" style={{ color: INK_2, fontSize: 13 }}>
+        {warehouses && warehouses.length > 0 && (
+          <select
+            value={selected?.id ?? ""}
+            onChange={(e) => router.push(`/reports?wh=${e.target.value}`)}
+            style={{
+              padding: "4px 8px",
+              borderRadius: 6,
+              border: "1px solid #33406b",
+              background: SURFACE,
+              color: INK,
+              fontSize: 13,
+            }}
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.code} — {w.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <Link href={selected ? `/?wh=${selected.id}` : "/"} style={{ color: INK_2, fontSize: 13 }}>
           ← Về kho 3D
         </Link>
       </header>
 
       {error && <p style={{ color: SERIOUS }}>{error}</p>}
-      {!error && (!summary || !rows) && <p style={{ color: INK_2 }}>Đang tải…</p>}
+      {!error && warehouses && warehouses.length === 0 && (
+        <p style={{ color: INK_2 }}>Chưa có kho nào — tạo kho qua POST /api/warehouses.</p>
+      )}
+      {!error && selected && (!summary || !rows) && <p style={{ color: INK_2 }}>Đang tải…</p>}
 
       {summary && (
         <section
@@ -134,7 +189,7 @@ export default function ReportsPage() {
 
       {rows && <ThroughputChart rows={rows} />}
 
-      {summary && <WhatIfSection />}
+      {summary && selected && <WhatIfSection warehouseId={selected.id} />}
     </main>
   );
 }
@@ -143,7 +198,7 @@ export default function ReportsPage() {
  * Layout what-if: re-put the current stock into a hypothetical grid (backend
  * simulation, nothing persisted) and compare the two layouts side by side.
  */
-function WhatIfSection() {
+function WhatIfSection({ warehouseId }: { warehouseId: number }) {
   const [zones, setZones] = useState(1);
   const [aisles, setAisles] = useState(2);
   const [racks, setRacks] = useState(2);
@@ -159,7 +214,7 @@ function WhatIfSection() {
     setError(null);
     try {
       setResult(
-        await simulateLayout({
+        await simulateLayout(warehouseId, {
           zones,
           aislesPerZone: aisles,
           racksPerAisle: racks,

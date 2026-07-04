@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.stockpile.inventory.domain.Location;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.setup.dto.WarehouseGenerationResult;
 import com.stockpile.setup.dto.WarehouseGridSpec;
@@ -36,15 +37,20 @@ import lombok.RequiredArgsConstructor;
 public class WarehouseGeneratorService {
 
 	private final LocationRepository locationRepository;
+	private final WarehouseService warehouseService;
 
 	@Transactional
-	public WarehouseGenerationResult generate(WarehouseGridSpec spec) {
-		if (locationRepository.count() > 0) {
+	public WarehouseGenerationResult generate(Long warehouseId, WarehouseGridSpec spec) {
+		Warehouse warehouse = warehouseService.get(warehouseId);
+		if (locationRepository.countByWarehouseId(warehouseId) > 0) {
 			throw new IllegalStateException(
-					"Warehouse already has locations; generation is only allowed on an empty warehouse");
+					"Warehouse " + warehouse.getCode()
+							+ " already has locations; generation is only allowed on an empty warehouse");
 		}
 
-		List<Location> saved = locationRepository.saveAll(buildGrid(spec));
+		List<Location> grid = buildGrid(spec);
+		grid.forEach(l -> l.setWarehouse(warehouse));
+		List<Location> saved = locationRepository.saveAll(grid);
 		return new WarehouseGenerationResult(saved.size(), spec.zones(), spec.aislesPerZone(),
 				spec.racksPerAisle(), spec.levelsPerRack(), spec.binsPerLevel());
 	}

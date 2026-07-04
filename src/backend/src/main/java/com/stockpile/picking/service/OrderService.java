@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.stockpile.common.NotFoundException;
 import com.stockpile.inventory.domain.Sku;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.picking.domain.OrderLine;
 import com.stockpile.picking.domain.PickOrder;
 import com.stockpile.picking.dto.OrderDto;
@@ -23,6 +24,7 @@ public class OrderService {
 
 	private final PickOrderRepository orderRepository;
 	private final SkuRepository skuRepository;
+	private final WarehouseRepository warehouseRepository;
 
 	@Transactional(readOnly = true)
 	public List<OrderDto> findAll() {
@@ -38,6 +40,8 @@ public class OrderService {
 	public OrderDto create(OrderDto dto) {
 		PickOrder order = new PickOrder();
 		order.setCode(dto.code());
+		order.setWarehouse(warehouseRepository.findById(dto.warehouseId())
+				.orElseThrow(() -> new NotFoundException("Warehouse " + dto.warehouseId() + " not found")));
 		for (OrderLineDto lineDto : dto.lines()) {
 			order.addLine(newLine(lineDto));
 		}

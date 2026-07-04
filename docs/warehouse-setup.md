@@ -23,7 +23,7 @@ Mỗi cách đều ghi: *cần khi nào* và *được gì / mất gì*.
 ## 1. Hiện trạng — có gì, thiếu gì
 
 ### Đã có ✅
-- **Bảng `location` đầy đủ** ([data-model.md](./data-model.md), [V1__core_schema.sql](../src/backend/src/main/resources/db/migration/V1__core_schema.sql)): mỗi ô có `zone/aisle/rack/level/bin` (mã phân cấp), tọa độ góc `x/y/z`, kích thước `w/d/h`, `lane_id`, `access_face` (hướng lấy hàng), ràng buộc UNIQUE trên mã ô.
+- **Bảng `location` đầy đủ** ([data-model.md](./data-model.md), [V1__core_schema.sql](../src/backend/src/main/resources/db/migration/V1__core_schema.sql)): mỗi ô có `zone/aisle/rack/level/bin` (mã phân cấp), tọa độ góc `x/y/z`, kích thước `w/d/h`, `lane_id`, `access_face` (hướng lấy hàng), ràng buộc UNIQUE trên mã ô **trong một kho** (từ V3/ADR-0009, mỗi location thuộc một `warehouse`).
 - **API CRUD từng ô** ([LocationController.java](../src/backend/src/main/java/com/stockpile/inventory/controller/LocationController.java)): `POST /api/locations` tạo **một** vị trí, có validation.
 - **Frontend đọc & vẽ** vị trí lên 3D ([Warehouse3D.tsx](../src/frontend/src/components/Warehouse3D.tsx)) — nhưng chỉ **hiển thị**, không tạo.
 
@@ -53,7 +53,7 @@ Mỗi cách đều ghi: *cần khi nào* và *được gì / mất gì*.
 ```
 → Sinh ra `2·4·6·4·3 = 576` bản ghi `location`, tọa độ `x/y/z` tính tự động từ chỉ số ô nhân kích thước + khoảng cách, `lane_id` gán theo `(zone, aisle, rack)` (đúng invariant "blocking cục bộ theo lane"), mã `zone/aisle/rack/level/bin` đánh số tuần tự.
 
-**Cách hiện thực:** một service `WarehouseGeneratorService` + endpoint `POST /api/warehouse/generate`, **hoặc** một Flyway migration/seed script cho môi trường dev. Ghi tất cả trong **một transaction** (giao dịch — hoặc thành công hết, hoặc không gì).
+**Cách hiện thực:** một service `WarehouseGeneratorService` + endpoint `POST /api/warehouses/{id}/generate` (tạo kho trước bằng `POST /api/warehouses` với `{code, name}`), **hoặc** một Flyway migration/seed script cho môi trường dev. Ghi tất cả trong **một transaction** (giao dịch — hoặc thành công hết, hoặc không gì). Guard "đã có location thì từ chối" tính **theo kho đích** (ADR-0009) — kho thứ hai/ba generate bình thường khi kho đó còn trống.
 
 | | |
 |---|---|

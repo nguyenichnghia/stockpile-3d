@@ -9,10 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.stockpile.common.NotFoundException;
 import com.stockpile.inventory.domain.Location;
 import com.stockpile.inventory.domain.Movement;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.dto.MovementDto;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.MovementRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.realtime.event.MovementRecordedEvent;
 
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,10 @@ import lombok.RequiredArgsConstructor;
  * Records physical movements. Every change to the warehouse goes through here:
  * the movement is appended to the ledger (never updated or deleted) and the
  * placement projection is updated in the same transaction.
+ *
+ * <p>Every movement happens in exactly one warehouse (ADR-0009): the warehouse
+ * is derived from the bins, and a movement whose bins belong to two different
+ * warehouses is rejected — v1 has no cross-warehouse transfers.
  *
  * <p>After applying the projection it publishes a {@link MovementRecordedEvent}
  * so the realtime layer can push a delta to the 3D scene. Publishing only —
@@ -33,6 +39,7 @@ public class MovementService {
 	private final MovementRepository movementRepository;
 	private final LotRepository lotRepository;
 	private final LocationRepository locationRepository;
+	private final WarehouseRepository warehouseRepository;
 	private final PlacementProjectionService projectionService;
 	private final ApplicationEventPublisher eventPublisher;
 
@@ -41,6 +48,7 @@ public class MovementService {
 		if (movement.getTs() == null) {
 			movement.setTs(Instant.now());
 		}
+		validateWarehouse(movement);
 		Movement saved = movementRepository.save(movement);
 		projectionService.apply(saved);
 		MovementRecordedEvent event = buildEvent(saved);
@@ -48,6 +56,34 @@ public class MovementService {
 			eventPublisher.publishEvent(event);
 		}
 		return saved;
+	}
+
+	/**
+	 * Enforces the one-warehouse-per-movement rule: both bins (when present) must
+	 * belong to the movement's warehouse. When no warehouse was stated, it is
+	 * derived from the bins; a movement with neither bins nor warehouse is invalid.
+	 */
+	private static void validateWarehouse(Movement m) {
+		Warehouse fromWh = m.getFromBin() == null ? null : m.getFromBin().getWarehouse();
+		Warehouse toWh = m.getToBin() == null ? null : m.getToBin().getWarehouse();
+
+		if (fromWh != null && toWh != null && !fromWh.getId().equals(toWh.getId())) {
+			throw new IllegalArgumentException(
+					"Movement crosses warehouses (" + fromWh.getCode() + " -> " + toWh.getCode()
+							+ "); cross-warehouse transfers are not supported");
+		}
+
+		Warehouse binWh = toWh != null ? toWh : fromWh;
+		if (m.getWarehouse() == null) {
+			if (binWh == null) {
+				throw new IllegalArgumentException(
+						"warehouseId is required for a movement with no bins (e.g. INBOUND to staging)");
+			}
+			m.setWarehouse(binWh);
+		} else if (binWh != null && !m.getWarehouse().getId().equals(binWh.getId())) {
+			throw new IllegalArgumentException(
+					"warehouseId does not match the bins' warehouse (" + binWh.getCode() + ")");
+		}
 	}
 
 	/**
@@ -64,6 +100,7 @@ public class MovementService {
 		return new MovementRecordedEvent(
 				m.getLot().getId(),
 				m.getType(),
+				m.getWarehouse().getId(),
 				from == null ? null : from.getId(),
 				from == null ? null : from.getLaneId(),
 				to == null ? null : to.getId(),
@@ -81,12 +118,21 @@ public class MovementService {
 		movement.setLot(lotRepository.findById(dto.lotId())
 				.orElseThrow(() -> new NotFoundException("Lot " + dto.lotId() + " not found")));
 		movement.setType(dto.type());
+		movement.setWarehouse(resolveWarehouse(dto.warehouseId()));
 		movement.setFromBin(resolveBin(dto.fromBin()));
 		movement.setToBin(resolveBin(dto.toBin()));
 		movement.setTs(dto.ts());
 		movement.setActor(dto.actor());
 		movement.setScanRef(dto.scanRef());
 		return record(movement);
+	}
+
+	private Warehouse resolveWarehouse(Long id) {
+		if (id == null) {
+			return null;
+		}
+		return warehouseRepository.findById(id)
+				.orElseThrow(() -> new NotFoundException("Warehouse " + id + " not found"));
 	}
 
 	private Location resolveBin(Long id) {

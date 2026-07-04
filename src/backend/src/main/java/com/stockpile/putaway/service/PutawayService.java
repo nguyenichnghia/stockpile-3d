@@ -38,11 +38,11 @@ public class PutawayService {
 	private final PutawayWeights weights;
 
 	@Transactional(readOnly = true)
-	public PutawaySuggestion suggest(long lotId) {
+	public PutawaySuggestion suggest(long lotId, long warehouseId) {
 		Lot lot = lotRepository.findById(lotId)
 				.orElseThrow(() -> new NotFoundException("Lot " + lotId + " not found"));
 
-		List<Location> empty = locationRepository.findEmpty();
+		List<Location> empty = locationRepository.findEmptyInWarehouse(warehouseId);
 		List<ScoredBin> scored = new ArrayList<>();
 		for (Location c : empty) {
 			if (!PutawayScorer.fits(lot, c)) {
@@ -58,7 +58,8 @@ public class PutawayService {
 
 	/** Existing lots in the bin's lane, as boxes for the blocking check. */
 	private List<LotBox> laneLots(Location bin) {
-		return placementRepository.findByBin_LaneId(bin.getLaneId()).stream()
+		return placementRepository
+				.findByBin_WarehouseIdAndBin_LaneId(bin.getWarehouse().getId(), bin.getLaneId()).stream()
 				.map(PutawayService::toBox)
 				.toList();
 	}

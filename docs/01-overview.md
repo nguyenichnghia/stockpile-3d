@@ -86,11 +86,12 @@ Stockpile-3D biểu diễn kho dưới dạng **mô hình không gian 3 chiều 
 
 | Thực thể | Vai trò | Trường then chốt |
 |---|---|---|
-| `Location` (zone→aisle→rack→level→bin) | Khung không gian kho | toạ độ `(x,y,z)` góc, kích thước `(w,d,h)`, `lane_id`, `access_face` (hướng lấy hàng) |
+| `Warehouse` | Một site kho vật lý (ADR-0009) | `code` (UNIQUE), `name`; mỗi kho có hệ tọa độ riêng, dock ở gốc `(0,0,0)` |
+| `Location` (zone→aisle→rack→level→bin) | Khung không gian kho | `warehouse_id`, toạ độ `(x,y,z)` góc, kích thước `(w,d,h)`, `lane_id`, `access_face` (hướng lấy hàng); mã ô UNIQUE **trong một kho** |
 | `Sku` | Master sản phẩm | `dims`, `weight`, `handling` (FIFO/FEFO) |
 | `Lot` | Đơn vị vật lý đặt trong kho | `sku_id`, bounding box `(w,d,h)`, `weight`, `expiry`, `predicted_retrieval_at` |
 | `Placement` | Lô đang chiếm vị trí nào | `lot_id`, `bin_id`, pose `(x,y,z)` — **projection từ ledger** |
-| `Movement` | Bút toán vật lý (append-only) | `lot_id`, `type`, `from_bin`, `to_bin`, `ts`, `actor`, `scan_ref` |
+| `Movement` | Bút toán vật lý (append-only) | `lot_id`, `warehouse_id`, `type`, `from_bin`, `to_bin`, `ts`, `actor`, `scan_ref`; hai bin phải cùng kho (chưa có transfer, ADR-0009) |
 
 **Quan hệ "blocking" — trái tim của hệ thống.** Lô **B chặn A** nếu để rút A ra theo `access_face` của lane, bắt buộc phải dời B trước. Định nghĩa hình học:
 - **Chặn trên (on-top):** `B.z_min ≥ A.z_max` và hình chiếu `(x,y)` của B giao với A. *(Dùng `≥` cho cùng tầng là sai — xem Dev Log 2026-06-25 ở file 03.)*
@@ -98,7 +99,7 @@ Stockpile-3D biểu diễn kho dưới dạng **mô hình không gian 3 chiều 
 
 Tập quan hệ này tạo **đồ thị blocking có hướng** (DAG khi xếp hợp lệ). CRP làm việc trên đồ thị này.
 
-**Quyết định khóa: không dùng PostGIS/R-tree toàn cục cho v1.** Quan hệ blocking là **cục bộ trong từng lane/stack** — không cần index không gian 3D toàn kho. Chỉ cần phân vùng theo `(zone, aisle, rack)` rồi suy luận trong lane (vài → vài chục lô). Điều này giữ truy vấn đơn giản, tránh phụ thuộc nặng (PostGIS) chưa cần ở quy mô mục tiêu, và để dành nâng cấp index không gian cho giai đoạn multi-warehouse. *(Sẽ ghi thành ADR riêng theo mẫu file 03.)*
+**Quyết định khóa: không dùng PostGIS/R-tree toàn cục.** Quan hệ blocking là **cục bộ trong từng lane/stack** — không cần index không gian 3D toàn kho. Chỉ cần phân vùng theo `(zone, aisle, rack)` rồi suy luận trong lane (vài → vài chục lô). Điều này giữ truy vấn đơn giản và tránh phụ thuộc nặng (PostGIS) chưa cần ở quy mô mục tiêu. *(Đã xem xét lại khi làm multi-warehouse — **ADR-0009** giữ nguyên quyết định và thu hẹp phạm vi: khóa phân vùng thành `(warehouse_id, lane_id)`, một lane luôn nằm trọn trong một kho; chỉ bàn lại index không gian nếu một kho đơn lẻ vượt xa quy mô mục tiêu §7.)*
 
 ---
 

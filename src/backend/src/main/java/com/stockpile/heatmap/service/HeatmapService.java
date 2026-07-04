@@ -49,22 +49,22 @@ public class HeatmapService {
 	private final PlacementRepository placementRepository;
 
 	@Transactional(readOnly = true)
-	public HeatmapResult compute(String metric) {
+	public HeatmapResult compute(String metric, Long warehouseId) {
 		String m = metric == null || metric.isBlank() ? "fill" : metric.trim().toLowerCase();
 		return switch (m) {
-			case "fill" -> fill();
-			case "blocking" -> blocking();
-			case "expiry" -> expiry();
+			case "fill" -> fill(warehouseId);
+			case "blocking" -> blocking(warehouseId);
+			case "expiry" -> expiry(warehouseId);
 			default -> throw new IllegalArgumentException("Unknown heatmap metric: " + metric);
 		};
 	}
 
 	/** Binary occupancy: a bin holding a lot is 1.0 (hot), an empty bin 0.0. */
-	private HeatmapResult fill() {
-		Set<Long> occupied = placementRepository.findAll().stream()
+	private HeatmapResult fill(Long warehouseId) {
+		Set<Long> occupied = placementRepository.findByBin_WarehouseId(warehouseId).stream()
 				.map(p -> p.getBin().getId())
 				.collect(Collectors.toSet());
-		List<Cell> cells = locationRepository.findAll().stream()
+		List<Cell> cells = locationRepository.findByWarehouseId(warehouseId).stream()
 				.map(l -> new Cell(l.getId(), occupied.contains(l.getId()) ? 1.0 : 0.0))
 				.toList();
 		return new HeatmapResult("fill", cells);
@@ -75,9 +75,9 @@ public class HeatmapService {
 	 * in-front, per {@link BlockingGraph}), normalized by {@link #BLOCKING_CAP}.
 	 * Blocking is lane-local, so we reason within each lane. Empty bins are 0.0.
 	 */
-	private HeatmapResult blocking() {
+	private HeatmapResult blocking(Long warehouseId) {
 		// Group placed lots by lane so the blocking graph stays lane-local.
-		Map<String, List<Placement>> byLane = placementRepository.findAll().stream()
+		Map<String, List<Placement>> byLane = placementRepository.findByBin_WarehouseId(warehouseId).stream()
 				.collect(Collectors.groupingBy(p -> p.getBin().getLaneId()));
 
 		Map<Long, Double> valueByBin = new HashMap<>();
@@ -90,7 +90,7 @@ public class HeatmapService {
 			}
 		}
 
-		List<Cell> cells = locationRepository.findAll().stream()
+		List<Cell> cells = locationRepository.findByWarehouseId(warehouseId).stream()
 				.map(l -> new Cell(l.getId(), valueByBin.getOrDefault(l.getId(), 0.0)))
 				.toList();
 		return new HeatmapResult("blocking", cells);
@@ -100,13 +100,13 @@ public class HeatmapService {
 	 * How close each lot is to its use-by date, over {@link #EXPIRY_HORIZON_DAYS}.
 	 * Empty bins and lots without an expiry are 0.0 (green); expired lots are 1.0.
 	 */
-	private HeatmapResult expiry() {
+	private HeatmapResult expiry(Long warehouseId) {
 		LocalDate today = LocalDate.now();
 		Map<Long, Double> valueByBin = new HashMap<>();
-		for (Placement p : placementRepository.findAll()) {
+		for (Placement p : placementRepository.findByBin_WarehouseId(warehouseId)) {
 			valueByBin.put(p.getBin().getId(), expiryUrgency(p.getLot().getExpiry(), today));
 		}
-		List<Cell> cells = locationRepository.findAll().stream()
+		List<Cell> cells = locationRepository.findByWarehouseId(warehouseId).stream()
 				.map(l -> new Cell(l.getId(), valueByBin.getOrDefault(l.getId(), 0.0)))
 				.toList();
 		return new HeatmapResult("expiry", cells);

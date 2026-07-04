@@ -15,6 +15,8 @@ public record MovementDto(
 		Long id,
 		@NotNull Long lotId,
 		@NotNull MovementType type,
+		/** Required when both bins are null (INBOUND to staging); derived otherwise. */
+		Long warehouseId,
 		Long fromBin,
 		Long toBin,
 		Instant ts,
@@ -26,6 +28,7 @@ public record MovementDto(
 				m.getId(),
 				m.getLot().getId(),
 				m.getType(),
+				m.getWarehouse().getId(),
 				m.getFromBin() == null ? null : m.getFromBin().getId(),
 				m.getToBin() == null ? null : m.getToBin().getId(),
 				m.getTs(),

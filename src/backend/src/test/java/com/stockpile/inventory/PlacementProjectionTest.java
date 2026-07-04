@@ -23,10 +23,12 @@ import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Placement;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.PlacementRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.inventory.service.PlacementProjectionService;
 
@@ -44,6 +46,9 @@ class PlacementProjectionTest {
 	@Autowired LocationRepository locationRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired SkuRepository skuRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void putawayCreatesPlacementAtBinCorner() {
@@ -116,12 +121,59 @@ class PlacementProjectionTest {
 				.isInstanceOf(IllegalStateException.class);
 	}
 
+	@Test
+	void movementAcrossWarehousesIsRejected() {
+		// v1 has no cross-warehouse transfers (ADR-0009): the ledger refuses a
+		// movement whose bins belong to two different warehouses.
+		Lot lot = newLot();
+		Location here = newLocation("H", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+		Location elsewhere = newLocationIn(newWarehouse(), "E");
+
+		movementService.record(movement(lot, MovementType.PUTAWAY, null, here));
+
+		assertThatThrownBy(() -> movementService.record(
+				movement(lot, MovementType.RELOCATE, here, elsewhere)))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("crosses warehouses");
+	}
+
+	@Test
+	void movementWithoutBinsRequiresAWarehouse() {
+		Lot lot = newLot();
+
+		// INBOUND to staging carries no bins, so the warehouse must be stated…
+		assertThatThrownBy(() -> movementService.record(movement(lot, MovementType.INBOUND, null, null)))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("warehouseId is required");
+
+		// …and with it stated, the ledger records the event in that warehouse.
+		Movement staged = movement(lot, MovementType.INBOUND, null, null);
+		staged.setWarehouse(warehouse());
+		Movement saved = movementService.record(staged);
+		assertThat(saved.getWarehouse().getId()).isEqualTo(warehouse().getId());
+	}
+
 	// --- helpers ---
 
 	/** Current placements as lot id -> bin id, for order-independent comparison. */
 	private Map<Long, Long> placementsByLot() {
 		return placementRepository.findAll().stream()
 				.collect(Collectors.toMap(p -> p.getLot().getId(), p -> p.getBin().getId()));
+	}
+
+	/** The default test warehouse (bin codes stay unique via nanoTime). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			wh = newWarehouse();
+		}
+		return wh;
+	}
+
+	private Warehouse newWarehouse() {
+		Warehouse w = new Warehouse();
+		w.setCode("WH-" + System.nanoTime());
+		w.setName("Test warehouse");
+		return warehouseRepository.save(w);
 	}
 
 	private Sku newSku() {
@@ -147,7 +199,16 @@ class PlacementProjectionTest {
 	}
 
 	private Location newLocation(String bin, BigDecimal x, BigDecimal y, BigDecimal z) {
+		return newLocationAt(warehouse(), bin, x, y, z);
+	}
+
+	private Location newLocationIn(Warehouse warehouse, String bin) {
+		return newLocationAt(warehouse, bin, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+	}
+
+	private Location newLocationAt(Warehouse warehouse, String bin, BigDecimal x, BigDecimal y, BigDecimal z) {
 		Location location = new Location();
+		location.setWarehouse(warehouse);
 		location.setZone("Z");
 		location.setAisle("A");
 		location.setRack("R");

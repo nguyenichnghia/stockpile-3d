@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Positive;
 /** Request/response payload for {@link Location}. */
 public record LocationDto(
 		Long id,
+		@NotNull Long warehouseId,
 		@NotBlank String zone,
 		@NotBlank String aisle,
 		@NotBlank String rack,
@@ -27,11 +28,12 @@ public record LocationDto(
 		@NotNull AccessFace accessFace) {
 
 	public static LocationDto from(Location l) {
-		return new LocationDto(l.getId(), l.getZone(), l.getAisle(), l.getRack(),
-				l.getLevel(), l.getBin(), l.getX(), l.getY(), l.getZ(),
+		return new LocationDto(l.getId(), l.getWarehouse().getId(), l.getZone(), l.getAisle(),
+				l.getRack(), l.getLevel(), l.getBin(), l.getX(), l.getY(), l.getZ(),
 				l.getW(), l.getD(), l.getH(), l.getLaneId(), l.getAccessFace());
 	}
 
+	/** Copies scalar fields; the warehouse reference is resolved by the service. */
 	public void applyTo(Location l) {
 		l.setZone(zone);
 		l.setAisle(aisle);

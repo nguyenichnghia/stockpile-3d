@@ -18,9 +18,11 @@ import com.stockpile.inventory.domain.HandlingType;
 import com.stockpile.inventory.domain.Location;
 import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.putaway.dto.PutawaySuggestion;
 import com.stockpile.putaway.service.PutawayService;
 
@@ -37,6 +39,9 @@ class PutawayServiceTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void recommendsBinNearestDockAndLowest() {
@@ -46,7 +51,7 @@ class PutawayServiceTest {
 		newLocation("FAR", 50, 50, 0);
 		newLocation("HIGH", 1, 0, 10);
 
-		PutawaySuggestion s = putawayService.suggest(lot.getId());
+		PutawaySuggestion s = putawayService.suggest(lot.getId(), warehouse().getId());
 
 		assertThat(s.recommendedBinId()).isEqualTo(near.getId());
 		assertThat(s.candidates()).hasSize(3);
@@ -61,7 +66,7 @@ class PutawayServiceTest {
 		newLocationSized("TINY", 0, 0, 0, new BigDecimal("0.5")); // too small
 		Location ok = newLocation("OK", 2, 0, 0);
 
-		PutawaySuggestion s = putawayService.suggest(big.getId());
+		PutawaySuggestion s = putawayService.suggest(big.getId(), warehouse().getId());
 
 		assertThat(s.candidates()).extracting(PutawaySuggestion.ScoredBin::binId)
 				.containsExactly(ok.getId());
@@ -72,13 +77,24 @@ class PutawayServiceTest {
 		Lot lot = newLot(false);
 		newLocationSized("SMALL", 0, 0, 0, new BigDecimal("0.1"));
 
-		PutawaySuggestion s = putawayService.suggest(lot.getId());
+		PutawaySuggestion s = putawayService.suggest(lot.getId(), warehouse().getId());
 
 		assertThat(s.recommendedBinId()).isNull();
 		assertThat(s.candidates()).isEmpty();
 	}
 
 	// --- helpers ---
+
+	/** The single test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
 
 	private Sku newSku() {
 		Sku sku = new Sku();
@@ -111,6 +127,7 @@ class PutawayServiceTest {
 
 	private Location newLocationSized(String bin, double x, double y, double z, BigDecimal size) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");

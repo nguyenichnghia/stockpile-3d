@@ -33,9 +33,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.realtime.dto.PlacementDelta;
 
@@ -58,6 +60,9 @@ class PlacementBroadcastTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	@Test
 	void putawayBroadcastsUpsertToTheLane() throws Exception {
@@ -111,6 +116,7 @@ class PlacementBroadcastTest {
 
 	// --- STOMP client ---
 
+	/** Subscribes to the warehouse-qualified lane topic (ADR-0009). */
 	private BlockingQueue<PlacementDelta> subscribe(String lane) throws Exception {
 		WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());
 		// The server serializes the Instant ts as an ISO string; the client converter
@@ -124,7 +130,8 @@ class PlacementBroadcastTest {
 				.get(5, TimeUnit.SECONDS);
 
 		BlockingQueue<PlacementDelta> queue = new LinkedBlockingQueue<>();
-		session.subscribe("/topic/lane/" + lane, new StompFrameHandler() {
+		session.subscribe("/topic/warehouse/" + warehouse().getId() + "/lane/" + lane,
+				new StompFrameHandler() {
 			@Override
 			public Type getPayloadType(StompHeaders headers) {
 				return PlacementDelta.class;
@@ -139,6 +146,17 @@ class PlacementBroadcastTest {
 	}
 
 	// --- data helpers ---
+
+	/** One warehouse per test instance (bin codes stay unique via nanoTime). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
 
 	private Sku sku() {
 		Sku s = new Sku();
@@ -164,6 +182,7 @@ class PlacementBroadcastTest {
 
 	private Location bin(String lane, double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");

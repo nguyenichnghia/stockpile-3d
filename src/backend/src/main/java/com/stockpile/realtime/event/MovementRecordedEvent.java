@@ -20,6 +20,7 @@ import com.stockpile.inventory.domain.MovementType;
 public record MovementRecordedEvent(
 		Long lotId,
 		MovementType type,
+		Long warehouseId,
 		Long fromBinId,
 		String fromLaneId,
 		Long toBinId,

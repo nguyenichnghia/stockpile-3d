@@ -7,6 +7,6 @@ import com.stockpile.picking.domain.PickOrder;
 
 public interface PickOrderRepository extends JpaRepository<PickOrder, Long> {
 
-	/** Orders in one lifecycle state (e.g. how many are still OPEN, for reporting). */
-	long countByStatus(OrderStatus status);
+	/** Orders of one warehouse in one lifecycle state (e.g. OPEN backlog, for reporting). */
+	long countByWarehouseIdAndStatus(Long warehouseId, OrderStatus status);
 }

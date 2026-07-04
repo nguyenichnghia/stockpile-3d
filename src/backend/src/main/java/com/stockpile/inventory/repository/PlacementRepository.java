@@ -13,11 +13,14 @@ public interface PlacementRepository extends JpaRepository<Placement, Long> {
 
 	void deleteByLotId(Long lotId);
 
-	/** All placements whose bin belongs to the given lane (for the blocking graph). */
-	List<Placement> findByBin_LaneId(String laneId);
+	/** All placements in one warehouse (scene load, heatmap, reports, what-if). */
+	List<Placement> findByBin_WarehouseId(Long warehouseId);
 
-	/** Current placements of every lot of the given SKU code (for locate/search). */
-	List<Placement> findByLot_Sku_CodeIgnoreCase(String code);
+	/** All placements whose bin belongs to the given lane (for the blocking graph). */
+	List<Placement> findByBin_WarehouseIdAndBin_LaneId(Long warehouseId, String laneId);
+
+	/** Current placements of every lot of the given SKU code within one warehouse. */
+	List<Placement> findByBin_WarehouseIdAndLot_Sku_CodeIgnoreCase(Long warehouseId, String code);
 
 	/** Lots currently placed in the given bin (for scan resolve). */
 	List<Placement> findByBinId(Long binId);

@@ -28,23 +28,25 @@ public class LocateService {
 	private final LocationRepository locationRepository;
 
 	@Transactional(readOnly = true)
-	public LocateResult locateBySku(String code) {
+	public LocateResult locateBySku(String code, Long warehouseId) {
 		if (code == null || code.isBlank()) {
 			throw new IllegalArgumentException("sku code must not be blank");
 		}
-		List<Match> matches = placementRepository.findByLot_Sku_CodeIgnoreCase(code.trim()).stream()
+		List<Match> matches = placementRepository
+				.findByBin_WarehouseIdAndLot_Sku_CodeIgnoreCase(warehouseId, code.trim()).stream()
 				.map(LocateService::toMatch)
 				.toList();
 		return new LocateResult(code.trim(), matches.size(), matches);
 	}
 
 	/**
-	 * Locates a bin by its full code {@code zone-aisle-rack-level-bin}. Returns a
+	 * Locates a bin by its full code {@code zone-aisle-rack-level-bin} within one
+	 * warehouse (bin codes are only unique per warehouse, ADR-0009). Returns a
 	 * result with {@code found=false} when no such bin exists (an empty bin still
 	 * counts as found). Highlights the bin frame even if it holds no lot.
 	 */
 	@Transactional(readOnly = true)
-	public BinLocateResult locateByBinCode(String code) {
+	public BinLocateResult locateByBinCode(String code, Long warehouseId) {
 		if (code == null || code.isBlank()) {
 			throw new IllegalArgumentException("bin code must not be blank");
 		}
@@ -54,7 +56,8 @@ public class LocateService {
 					"bin code must be zone-aisle-rack-level-bin, got: " + code);
 		}
 		return locationRepository
-				.findByZoneAndAisleAndRackAndLevelAndBin(parts[0], parts[1], parts[2], parts[3], parts[4])
+				.findByWarehouseIdAndZoneAndAisleAndRackAndLevelAndBin(
+						warehouseId, parts[0], parts[1], parts[2], parts[3], parts[4])
 				.map(LocateService::toBinResult)
 				.orElseGet(() -> BinLocateResult.notFound(code.trim()));
 	}

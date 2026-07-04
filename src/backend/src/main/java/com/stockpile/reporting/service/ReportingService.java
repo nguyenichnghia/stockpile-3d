@@ -30,8 +30,9 @@ import lombok.RequiredArgsConstructor;
  * derived from the same sources the engines use (placement projection,
  * BlockingGraph, ledger), so the dashboard never disagrees with the scene.
  *
- * <p>Days are UTC: the ledger stores {@link Instant}s and v1 has no warehouse
- * timezone setting. Revisit alongside multi-warehouse.
+ * <p>All aggregates are per warehouse (ADR-0009). Days are UTC: the ledger
+ * stores {@link Instant}s and warehouses have no timezone setting yet — a
+ * future slice can add one per warehouse.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,9 +50,9 @@ public class ReportingService {
 	private final PickOrderRepository pickOrderRepository;
 
 	@Transactional(readOnly = true)
-	public ReportSummary summary() {
-		long totalBins = locationRepository.count();
-		List<Placement> placements = placementRepository.findAll();
+	public ReportSummary summary(Long warehouseId) {
+		long totalBins = locationRepository.countByWarehouseId(warehouseId);
+		List<Placement> placements = placementRepository.findByBin_WarehouseId(warehouseId);
 
 		long occupiedBins = placements.stream()
 				.map(p -> p.getBin().getId())
@@ -78,9 +79,9 @@ public class ReportingService {
 				countBlocked(placements),
 				expiringSoon,
 				expired,
-				pickOrderRepository.countByStatus(OrderStatus.OPEN),
-				movementRepository.countByTsGreaterThanEqual(
-						today.atStartOfDay(ZoneOffset.UTC).toInstant()));
+				pickOrderRepository.countByWarehouseIdAndStatus(warehouseId, OrderStatus.OPEN),
+				movementRepository.countByWarehouseIdAndTsGreaterThanEqual(
+						warehouseId, today.atStartOfDay(ZoneOffset.UTC).toInstant()));
 	}
 
 	/**
@@ -89,7 +90,7 @@ public class ReportingService {
 	 * {@value #MAX_DAYS} to keep the scan bounded.
 	 */
 	@Transactional(readOnly = true)
-	public List<MovementDaily> movementsDaily(Integer days) {
+	public List<MovementDaily> movementsDaily(Integer days, Long warehouseId) {
 		int d = days == null ? DEFAULT_DAYS : days;
 		if (d < 1 || d > MAX_DAYS) {
 			throw new IllegalArgumentException("days must be between 1 and " + MAX_DAYS);
@@ -98,7 +99,7 @@ public class ReportingService {
 				.minusDays(d - 1L)
 				.atStartOfDay(ZoneOffset.UTC)
 				.toInstant();
-		return movementRepository.countDailyByType(from).stream()
+		return movementRepository.countDailyByType(warehouseId, from).stream()
 				.map(r -> new MovementDaily(r.getDay(), r.getType(), r.getCnt()))
 				.toList();
 	}

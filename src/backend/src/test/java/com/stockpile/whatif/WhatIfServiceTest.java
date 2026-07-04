@@ -21,9 +21,11 @@ import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Movement;
 import com.stockpile.inventory.domain.MovementType;
 import com.stockpile.inventory.domain.Sku;
+import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.SkuRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.setup.dto.WarehouseGridSpec;
 import com.stockpile.whatif.dto.WhatIfResult;
@@ -43,6 +45,9 @@ class WhatIfServiceTest {
 	@Autowired SkuRepository skuRepository;
 	@Autowired LotRepository lotRepository;
 	@Autowired LocationRepository locationRepository;
+	@Autowired WarehouseRepository warehouseRepository;
+
+	private Warehouse wh;
 
 	/** 1 zone × 1 aisle × 1 rack; a flat wide grid vs the current stacked one. */
 	private static WarehouseGridSpec grid(int levels, int bins) {
@@ -57,7 +62,7 @@ class WhatIfServiceTest {
 		putaway(lot(sku), bin(0, 0, 0));
 		putaway(lot(sku), bin(0, 0, 1));
 
-		WhatIfResult r = whatIfService.simulate(grid(1, 4)); // flat: 4 bins, 1 level
+		WhatIfResult r = whatIfService.simulate(warehouse().getId(), grid(1, 4)); // flat: 4 bins, 1 level
 
 		assertThat(r.current().placedLots()).isEqualTo(2);
 		assertThat(r.current().blockedLots()).isEqualTo(1);
@@ -75,7 +80,7 @@ class WhatIfServiceTest {
 		putaway(lot(sku), bin(5, 0, 0));
 		putaway(lot(sku), bin(9, 0, 0));
 
-		WhatIfResult r = whatIfService.simulate(grid(1, 2)); // only 2 slots
+		WhatIfResult r = whatIfService.simulate(warehouse().getId(), grid(1, 2)); // only 2 slots
 
 		assertThat(r.simulated().placedLots()).isEqualTo(2);
 		assertThat(r.simulated().unplacedLots()).isEqualTo(1);
@@ -83,7 +88,7 @@ class WhatIfServiceTest {
 
 	@Test
 	void emptyWarehouseSimulatesToZeros() {
-		WhatIfResult r = whatIfService.simulate(grid(2, 3));
+		WhatIfResult r = whatIfService.simulate(warehouse().getId(), grid(2, 3));
 
 		assertThat(r.current().placedLots()).isZero();
 		assertThat(r.simulated().placedLots()).isZero();
@@ -93,13 +98,24 @@ class WhatIfServiceTest {
 
 	@Test
 	void oversizedGridIsRejected() {
-		assertThatThrownBy(() -> whatIfService.simulate(
+		assertThatThrownBy(() -> whatIfService.simulate(warehouse().getId(),
 				new WarehouseGridSpec(100, 100, 100, 10, 10,
 						BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, AccessFace.TOP)))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	// --- helpers ---
+
+	/** The single test warehouse, created lazily (rolled back between tests). */
+	private Warehouse warehouse() {
+		if (wh == null) {
+			Warehouse w = new Warehouse();
+			w.setCode("WH-" + System.nanoTime());
+			w.setName("Test warehouse");
+			wh = warehouseRepository.save(w);
+		}
+		return wh;
+	}
 
 	private Sku sku(String code) {
 		Sku s = new Sku();
@@ -115,6 +131,7 @@ class WhatIfServiceTest {
 
 	private Location bin(double x, double y, double z) {
 		Location l = new Location();
+		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack("R");
