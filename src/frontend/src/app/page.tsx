@@ -1,17 +1,43 @@
 import Link from "next/link";
 
 import WarehouseView from "@/components/WarehouseView";
-import { fetchLocations, fetchPlacements, type Location, type Placement } from "@/lib/api";
+import {
+  fetchLocations,
+  fetchPlacements,
+  fetchWarehouses,
+  type Location,
+  type Placement,
+  type Warehouse,
+} from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+/**
+ * The working warehouse is selected via the `?wh={id}` search param (ADR-0009);
+ * without it the first warehouse is shown. Every fetch below is scoped to it.
+ */
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ wh?: string }>;
+}) {
+  let warehouses: Warehouse[] = [];
   let locations: Location[] = [];
   let placements: Placement[] = [];
   let error: string | null = null;
 
+  const { wh } = await searchParams;
+  let selected: Warehouse | null = null;
+
   try {
-    [locations, placements] = await Promise.all([fetchLocations(), fetchPlacements()]);
+    warehouses = await fetchWarehouses();
+    selected = warehouses.find((w) => w.id === Number(wh)) ?? warehouses[0] ?? null;
+    if (selected) {
+      [locations, placements] = await Promise.all([
+        fetchLocations(selected.id),
+        fetchPlacements(selected.id),
+      ]);
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : "Unknown error";
   }
@@ -31,8 +57,25 @@ export default async function Home() {
         }}
       >
         <strong>Stockpile-3D</strong>
+        {warehouses.map((w) => (
+          <Link
+            key={w.id}
+            href={`/?wh=${w.id}`}
+            style={{
+              pointerEvents: "auto",
+              marginLeft: 12,
+              fontSize: 13,
+              color: w.id === selected?.id ? "#e6ecff" : "#9fb0d8",
+              fontWeight: w.id === selected?.id ? 700 : 400,
+              textDecoration: w.id === selected?.id ? "none" : "underline",
+            }}
+            title={w.name}
+          >
+            {w.code}
+          </Link>
+        ))}
         <Link
-          href="/reports"
+          href={selected ? `/reports?wh=${selected.id}` : "/reports"}
           style={{ pointerEvents: "auto", color: "#9fb0d8", fontSize: 13, marginLeft: 12 }}
         >
           Báo cáo →
@@ -40,11 +83,13 @@ export default async function Home() {
         <div style={{ fontSize: 13, opacity: 0.8 }}>
           {error
             ? `Không tải được dữ liệu — ${error}`
-            : `${locations.length} vị trí · ${placements.length} lô đang đặt`}
+            : selected
+              ? `${selected.name} · ${locations.length} vị trí · ${placements.length} lô đang đặt`
+              : "Chưa có kho nào"}
         </div>
       </header>
 
-      {error ? (
+      {error || !selected ? (
         <div
           style={{
             display: "flex",
@@ -59,14 +104,31 @@ export default async function Home() {
           }}
         >
           <div>
-            <p>Backend chưa sẵn sàng.</p>
-            <p style={{ fontSize: 13, opacity: 0.7 }}>
-              Chạy backend (cổng 8080) rồi tải lại trang.
-            </p>
+            {error ? (
+              <>
+                <p>Backend chưa sẵn sàng.</p>
+                <p style={{ fontSize: 13, opacity: 0.7 }}>
+                  Chạy backend (cổng 8080) rồi tải lại trang.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>Chưa có kho nào.</p>
+                <p style={{ fontSize: 13, opacity: 0.7 }}>
+                  Tạo kho qua POST /api/warehouses rồi sinh lưới bằng POST
+                  /api/warehouses/{"{id}"}/generate (docs/warehouse-setup.md).
+                </p>
+              </>
+            )}
           </div>
         </div>
       ) : (
-        <WarehouseView locations={locations} placements={placements} />
+        <WarehouseView
+          key={selected.id}
+          warehouseId={selected.id}
+          locations={locations}
+          placements={placements}
+        />
       )}
     </main>
   );

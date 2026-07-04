@@ -21,11 +21,13 @@ export type PlacementDelta = {
 };
 
 /**
- * Connects to the realtime endpoint and subscribes to the given lane topics.
- * Calls `onDelta` for each delta. Returns a disposer that closes the socket and
- * all subscriptions — call it from a React effect cleanup.
+ * Connects to the realtime endpoint and subscribes to the given lane topics of
+ * one warehouse (topics are warehouse-qualified, ADR-0009). Calls `onDelta`
+ * for each delta. Returns a disposer that closes the socket and all
+ * subscriptions — call it from a React effect cleanup.
  */
 export function connectPlacements(
+  warehouseId: number,
   laneIds: string[],
   onDelta: (delta: PlacementDelta) => void,
 ): () => void {
@@ -34,7 +36,7 @@ export function connectPlacements(
     reconnectDelay: 3000, // browser-side auto-reconnect
     onConnect: () => {
       for (const lane of laneIds) {
-        client.subscribe(`/topic/lane/${lane}`, (msg: IMessage) => {
+        client.subscribe(`/topic/warehouse/${warehouseId}/lane/${lane}`, (msg: IMessage) => {
           onDelta(JSON.parse(msg.body) as PlacementDelta);
         });
       }

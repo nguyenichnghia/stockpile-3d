@@ -28,9 +28,11 @@ import { applyDelta, connectPlacements } from "@/lib/realtime";
  * engine-proposed movement after explicit user confirmation.
  */
 export default function WarehouseView({
+  warehouseId,
   locations,
   placements: initialPlacements,
 }: {
+  warehouseId: number;
   locations: Location[];
   placements: Placement[];
 }) {
@@ -57,7 +59,7 @@ export default function WarehouseView({
   );
   useEffect(() => {
     if (laneIds.length === 0) return;
-    return connectPlacements(laneIds, (d) => {
+    return connectPlacements(warehouseId, laneIds, (d) => {
       setPlacements((prev) =>
         applyDelta(prev, d, (delta) => ({
           id: -1, // delta carries no placement row id; consumers key off lotId/binId
@@ -69,15 +71,16 @@ export default function WarehouseView({
         })),
       );
     });
-  }, [laneIds]);
+  }, [warehouseId, laneIds]);
 
-  // Orders for the pick-list dropdown. Loaded once; a failure just leaves the
-  // list empty (the rest of the view works without it).
+  // Orders for the pick-list dropdown — only this warehouse's orders, since a
+  // plan for another warehouse could not be shown on this scene. Loaded once; a
+  // failure just leaves the list empty (the rest of the view works without it).
   useEffect(() => {
     fetchOrders()
-      .then(setOrders)
+      .then((all) => setOrders(all.filter((o) => o.warehouseId === warehouseId)))
       .catch(() => {});
-  }, []);
+  }, [warehouseId]);
 
   const binById = useMemo(
     () => new Map(locations.map((l) => [l.id, l])),
@@ -153,7 +156,7 @@ export default function WarehouseView({
     }
     setBusy(true);
     try {
-      const result = await resolveScan(code);
+      const result = await resolveScan(code, warehouseId);
       if (result.type === "BIN" && result.found && result.bin) {
         setLocatedBinId(result.bin.id);
         setStatus(
@@ -187,7 +190,7 @@ export default function WarehouseView({
     setMetric(m);
     setBusy(true);
     try {
-      const result = await fetchHeatmap(m);
+      const result = await fetchHeatmap(m, warehouseId);
       setHeatmap(new Map(result.cells.map((c) => [c.binId, c.value])));
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Lỗi tải heatmap");
@@ -206,7 +209,7 @@ export default function WarehouseView({
     }
     setBusy(true);
     try {
-      const result = await locateBySku(sku);
+      const result = await locateBySku(sku, warehouseId);
       setHighlighted(new Set(result.matches.map((m) => m.binId)));
       setStatus(
         result.matchCount > 0

@@ -5,8 +5,17 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+/** A physical warehouse site (ADR-0009); every read below is scoped to one. */
+export type Warehouse = {
+  id: number;
+  code: string;
+  name: string;
+  createdAt: string;
+};
+
 export type Location = {
   id: number;
+  warehouseId: number;
   zone: string;
   aisle: string;
   rack: string;
@@ -74,8 +83,12 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const fetchLocations = () => getJson<Location[]>("/api/locations");
-export const fetchPlacements = () => getJson<Placement[]>("/api/placements");
+export const fetchWarehouses = () => getJson<Warehouse[]>("/api/warehouses");
+
+export const fetchLocations = (warehouseId: number) =>
+  getJson<Location[]>(`/api/locations?warehouseId=${warehouseId}`);
+export const fetchPlacements = (warehouseId: number) =>
+  getJson<Placement[]>(`/api/placements?warehouseId=${warehouseId}`);
 
 export type LocateMatch = {
   lotId: number;
@@ -92,8 +105,10 @@ export type LocateResult = {
 };
 
 /** Locate every placed lot of a SKU code (for highlight/dim on the 3D scene). */
-export const locateBySku = (sku: string) =>
-  getJson<LocateResult>(`/api/lots/locate?sku=${encodeURIComponent(sku)}`);
+export const locateBySku = (sku: string, warehouseId: number) =>
+  getJson<LocateResult>(
+    `/api/lots/locate?sku=${encodeURIComponent(sku)}&warehouseId=${warehouseId}`,
+  );
 
 export type ScanResult = {
   code: string;
@@ -113,10 +128,13 @@ export type ScanResult = {
 
 /**
  * Resolves a scanned (or typed) code — "LOT-{id}" or a full bin code
- * "zone-aisle-rack-level-bin" — to the lot or bin it names (ADR-0007).
+ * "zone-aisle-rack-level-bin" — to the lot or bin it names (ADR-0007). Bin
+ * codes are only unique per warehouse, so the working warehouse scopes them.
  */
-export const resolveScan = (code: string) =>
-  getJson<ScanResult>(`/api/scan?code=${encodeURIComponent(code)}`);
+export const resolveScan = (code: string, warehouseId: number) =>
+  getJson<ScanResult>(
+    `/api/scan?code=${encodeURIComponent(code)}&warehouseId=${warehouseId}`,
+  );
 
 export type HeatmapCell = { binId: number; value: number };
 
@@ -126,8 +144,10 @@ export type HeatmapResult = {
 };
 
 /** Per-bin heat values in [0,1] for coloring the whole warehouse by a metric. */
-export const fetchHeatmap = (metric = "fill") =>
-  getJson<HeatmapResult>(`/api/heatmap?metric=${encodeURIComponent(metric)}`);
+export const fetchHeatmap = (metric: string, warehouseId: number) =>
+  getJson<HeatmapResult>(
+    `/api/heatmap?metric=${encodeURIComponent(metric)}&warehouseId=${warehouseId}`,
+  );
 
 export type OrderLine = {
   id: number | null;
@@ -138,6 +158,7 @@ export type OrderLine = {
 export type Order = {
   id: number;
   code: string;
+  warehouseId: number;
   status: string;
   createdAt: string;
   lines: OrderLine[];
@@ -204,14 +225,16 @@ export type ReportSummary = {
   movementsToday: number;
 };
 
-export const fetchReportSummary = () =>
-  getJson<ReportSummary>("/api/reports/summary");
+export const fetchReportSummary = (warehouseId: number) =>
+  getJson<ReportSummary>(`/api/reports/summary?warehouseId=${warehouseId}`);
 
 /** Ledger throughput for one (UTC day, movement type); zero days emit no row. */
 export type MovementDaily = { date: string; type: string; count: number };
 
-export const fetchMovementsDaily = (days = 14) =>
-  getJson<MovementDaily[]>(`/api/reports/movements?days=${days}`);
+export const fetchMovementsDaily = (days: number, warehouseId: number) =>
+  getJson<MovementDaily[]>(
+    `/api/reports/movements?days=${days}&warehouseId=${warehouseId}`,
+  );
 
 /** Grid parameters for a hypothetical layout (same shape the generator takes). */
 export type GridSpec = {
@@ -239,8 +262,9 @@ export type LayoutMetrics = {
 export type WhatIfResult = { current: LayoutMetrics; simulated: LayoutMetrics };
 
 /**
- * Simulates re-putting the current stock into a hypothetical grid (SLAP order,
- * in-memory). Side-effect free despite the POST — nothing is persisted.
+ * Simulates re-putting one warehouse's current stock into a hypothetical grid
+ * (SLAP order, in-memory). Side-effect free despite the POST — nothing is
+ * persisted.
  */
-export const simulateLayout = (spec: GridSpec) =>
-  postJson<WhatIfResult>("/api/whatif/layout", spec);
+export const simulateLayout = (warehouseId: number, spec: GridSpec) =>
+  postJson<WhatIfResult>(`/api/whatif/layout?warehouseId=${warehouseId}`, spec);
