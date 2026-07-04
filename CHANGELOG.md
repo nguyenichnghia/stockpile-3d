@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-04
+Hoàn tất toàn bộ roadmap 4 giai đoạn — mảnh cuối: multi-warehouse.
+
 ### Added
 - **Multi-warehouse (giai đoạn 4, ADR-0009)** — nhiều kho vật lý độc lập trong một CSDL, hoàn tất mục roadmap cuối cùng:
   - Thực thể `Warehouse` (`code` UNIQUE, `name`) + Flyway `V3`: `location/movement/pick_order` mang `warehouse_id NOT NULL`; mã ô 5 đoạn giờ UNIQUE **trong một kho**; dữ liệu cũ backfill vào kho mặc định `MAIN` (chỉ tạo khi DB có dữ liệu). API `GET/POST /api/warehouses`.
