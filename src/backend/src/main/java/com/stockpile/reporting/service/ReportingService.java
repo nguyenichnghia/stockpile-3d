@@ -2,7 +2,7 @@ package com.stockpile.reporting.service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -10,11 +10,13 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.stockpile.common.NotFoundException;
 import com.stockpile.inventory.domain.Lot;
 import com.stockpile.inventory.domain.Placement;
 import com.stockpile.inventory.repository.LocationRepository;
 import com.stockpile.inventory.repository.MovementRepository;
 import com.stockpile.inventory.repository.PlacementRepository;
+import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.picking.domain.OrderStatus;
 import com.stockpile.picking.repository.PickOrderRepository;
 import com.stockpile.relocation.service.BlockingGraph;
@@ -30,9 +32,9 @@ import lombok.RequiredArgsConstructor;
  * derived from the same sources the engines use (placement projection,
  * BlockingGraph, ledger), so the dashboard never disagrees with the scene.
  *
- * <p>All aggregates are per warehouse (ADR-0009). Days are UTC: the ledger
- * stores {@link Instant}s and warehouses have no timezone setting yet — a
- * future slice can add one per warehouse.
+ * <p>All aggregates are per warehouse (ADR-0009). Days follow the warehouse's
+ * {@code timezone} (Flyway V5, default UTC): the ledger stores {@link Instant}s
+ * and only the bucketing into "today"/daily rows is local.
  */
 @Service
 @RequiredArgsConstructor
@@ -48,9 +50,11 @@ public class ReportingService {
 	private final PlacementRepository placementRepository;
 	private final MovementRepository movementRepository;
 	private final PickOrderRepository pickOrderRepository;
+	private final WarehouseRepository warehouseRepository;
 
 	@Transactional(readOnly = true)
 	public ReportSummary summary(Long warehouseId) {
+		ZoneId zone = zoneOf(warehouseId);
 		long totalBins = locationRepository.countByWarehouseId(warehouseId);
 		List<Placement> placements = placementRepository.findByBin_WarehouseId(warehouseId);
 
@@ -59,7 +63,7 @@ public class ReportingService {
 				.distinct()
 				.count();
 
-		LocalDate today = LocalDate.now(ZoneOffset.UTC);
+		LocalDate today = LocalDate.now(zone);
 		LocalDate horizon = today.plusDays(EXPIRY_HORIZON_DAYS);
 		long expired = placements.stream()
 				.filter(p -> isBefore(p.getLot(), today))
@@ -81,11 +85,12 @@ public class ReportingService {
 				expired,
 				pickOrderRepository.countByWarehouseIdAndStatus(warehouseId, OrderStatus.OPEN),
 				movementRepository.countByWarehouseIdAndTsGreaterThanEqual(
-						warehouseId, today.atStartOfDay(ZoneOffset.UTC).toInstant()));
+						warehouseId, today.atStartOfDay(zone).toInstant()),
+				zone.getId());
 	}
 
 	/**
-	 * Ledger throughput per (UTC day, type) for the last {@code days} days,
+	 * Ledger throughput per (local day, type) for the last {@code days} days,
 	 * today included. Null falls back to {@value #DEFAULT_DAYS}; capped at
 	 * {@value #MAX_DAYS} to keep the scan bounded.
 	 */
@@ -95,13 +100,24 @@ public class ReportingService {
 		if (d < 1 || d > MAX_DAYS) {
 			throw new IllegalArgumentException("days must be between 1 and " + MAX_DAYS);
 		}
-		Instant from = LocalDate.now(ZoneOffset.UTC)
+		ZoneId zone = zoneOf(warehouseId);
+		Instant from = LocalDate.now(zone)
 				.minusDays(d - 1L)
-				.atStartOfDay(ZoneOffset.UTC)
+				.atStartOfDay(zone)
 				.toInstant();
-		return movementRepository.countDailyByType(warehouseId, from).stream()
+		return movementRepository.countDailyByType(warehouseId, from, zone.getId()).stream()
 				.map(r -> new MovementDaily(r.getDay(), r.getType(), r.getCnt()))
 				.toList();
+	}
+
+	/**
+	 * The warehouse's reporting zone. The stored id was validated on write
+	 * ({@code WarehouseService}), so {@code ZoneId.of} cannot fail here.
+	 */
+	private ZoneId zoneOf(Long warehouseId) {
+		return warehouseRepository.findById(warehouseId)
+				.map(w -> ZoneId.of(w.getTimezone()))
+				.orElseThrow(() -> new NotFoundException("Warehouse " + warehouseId + " not found"));
 	}
 
 	/** Placed lots with at least one blocker; lane-local like everything blocking. */

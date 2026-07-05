@@ -12,6 +12,8 @@ export type Warehouse = {
   name: string;
   /** When on, the backend rejects movements without a matching lot scan (ADR-0007). */
   requireScan: boolean;
+  /** IANA zone id used to bucket reporting days (e.g. "Asia/Ho_Chi_Minh"). */
+  timezone: string;
   createdAt: string;
 };
 
@@ -225,12 +227,14 @@ export type ReportSummary = {
   expired: number;
   openOrders: number;
   movementsToday: number;
+  /** IANA zone id the day-based figures were bucketed in. */
+  timezone: string;
 };
 
 export const fetchReportSummary = (warehouseId: number) =>
   getJson<ReportSummary>(`/api/reports/summary?warehouseId=${warehouseId}`);
 
-/** Ledger throughput for one (UTC day, movement type); zero days emit no row. */
+/** Ledger throughput for one (local day, movement type); zero days emit no row. */
 export type MovementDaily = { date: string; type: string; count: number };
 
 export const fetchMovementsDaily = (days: number, warehouseId: number) =>
