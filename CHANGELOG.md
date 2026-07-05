@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Added
+- **Timezone theo kho cho reports** — cột `warehouse.timezone` (Flyway `V5`, IANA zone id, mặc định `'UTC'` — kho hiện có không đổi hành vi): các con số theo ngày của `/api/reports/*` ("movement hôm nay", cột throughput theo ngày) giờ gộp theo lịch địa phương của kho (`at time zone` trong query ledger) thay vì UTC; ledger vẫn lưu instant, chỉ cách chia rổ ngày thay đổi. Đặt lúc tạo kho hoặc `PATCH /api/warehouses/{id}` (`{"timezone":"Asia/Ho_Chi_Minh"}`, zone id sai → 400). `ReportSummary` trả thêm `timezone`; tile "Movement hôm nay" hiển thị múi giờ đang dùng thay nhãn "(UTC)" cứng. Reports của kho không tồn tại giờ trả 404 thay vì toàn số 0. Test: `ReportingServiceTest` (movement 01:00 giờ địa phương = 18:00 UTC hôm trước phải rơi vào ngày địa phương), `InventoryApiTest` (default UTC, PATCH, zone sai).
+
 ### Fixed
 - Lỗi thiếu query param bắt buộc (ví dụ gọi `/api/placements` không kèm `warehouseId`) hoặc param sai kiểu (`warehouseId=abc`) giờ trả 400 với `message` nêu tên param, cùng shape JSON với các lỗi khác — trước đó là body mặc định của Spring không có `message` (finding từ verify PR #28); frontend vốn hiển thị `message` nên giờ báo lỗi đọc được.
 

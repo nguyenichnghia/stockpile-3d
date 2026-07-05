@@ -41,6 +41,13 @@ public class Warehouse {
 	@Column(name = "require_scan", nullable = false)
 	private boolean requireScan = false;
 
+	/**
+	 * IANA zone id (e.g. {@code Asia/Ho_Chi_Minh}) used to bucket reporting
+	 * aggregates into local days. The ledger stores instants regardless.
+	 */
+	@Column(nullable = false)
+	private String timezone = "UTC";
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 }

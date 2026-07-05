@@ -18,6 +18,8 @@ public record ReportSummary(
 		/** Placed lots already past their expiry date. */
 		long expired,
 		long openOrders,
-		/** Ledger entries recorded since UTC midnight. */
-		long movementsToday) {
+		/** Ledger entries recorded since local midnight in {@code timezone}. */
+		long movementsToday,
+		/** IANA zone id the day-based figures were bucketed in. */
+		String timezone) {
 }

@@ -2,6 +2,7 @@ package com.stockpile.inventory;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -61,6 +62,28 @@ class InventoryApiTest {
 		mvc.perform(get("/api/warehouses/" + id))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.name").value("Test warehouse"));
+	}
+
+	@Test
+	void warehouseTimezoneDefaultsToUtcAndIsPatchable() throws Exception {
+		long id = createWarehouse();
+
+		mvc.perform(get("/api/warehouses/" + id))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.timezone").value("UTC"));
+
+		mvc.perform(patch("/api/warehouses/" + id)
+				.contentType(MediaType.APPLICATION_JSON).content("""
+						{"timezone":"Asia/Ho_Chi_Minh"}"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.timezone").value("Asia/Ho_Chi_Minh"));
+
+		mvc.perform(patch("/api/warehouses/" + id)
+				.contentType(MediaType.APPLICATION_JSON).content("""
+						{"timezone":"Mars/Olympus"}"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(
+						org.hamcrest.Matchers.containsString("Unknown timezone")));
 	}
 
 	@Test

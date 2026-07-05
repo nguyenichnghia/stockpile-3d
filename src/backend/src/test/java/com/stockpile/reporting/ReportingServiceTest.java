@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -17,6 +18,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.stockpile.common.NotFoundException;
 import com.stockpile.inventory.domain.AccessFace;
 import com.stockpile.inventory.domain.HandlingType;
 import com.stockpile.inventory.domain.Location;
@@ -122,6 +124,41 @@ class ReportingServiceTest {
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Test
+	void aggregatesFollowTheWarehouseTimezone() {
+		// +07:00, no DST: 01:00 local today is 18:00 UTC *yesterday* — under the
+		// old UTC bucketing this movement would land on the previous day and
+		// outside "today".
+		ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
+		Warehouse local = new Warehouse();
+		local.setCode("WH-TZ-" + System.nanoTime());
+		local.setName("Local-time warehouse");
+		local.setTimezone(zone.getId());
+		local = warehouseRepository.save(local);
+
+		Location bin = bin(local, "L9", 0, 0, 0);
+		Movement m = new Movement();
+		m.setLot(lot(sku("TZ-SKU"), null));
+		m.setType(MovementType.PUTAWAY);
+		m.setToBin(bin);
+		m.setTs(LocalDate.now(zone).atStartOfDay(zone).plusHours(1).toInstant());
+		movementService.record(m);
+
+		ReportSummary s = reportingService.summary(local.getId());
+		assertThat(s.timezone()).isEqualTo("Asia/Ho_Chi_Minh");
+		assertThat(s.movementsToday()).isEqualTo(1);
+
+		List<MovementDaily> rows = reportingService.movementsDaily(1, local.getId());
+		assertThat(rows).containsExactly(
+				new MovementDaily(LocalDate.now(zone), MovementType.PUTAWAY.name(), 1));
+	}
+
+	@Test
+	void summaryOfUnknownWarehouseIs404() {
+		assertThatThrownBy(() -> reportingService.summary(999_999L))
+				.isInstanceOf(NotFoundException.class);
+	}
+
 	// --- helpers (same shapes as the other service tests) ---
 
 	/** The single test warehouse, created lazily (rolled back between tests). */
@@ -149,8 +186,12 @@ class ReportingServiceTest {
 
 	/** A 1×1×1 bin at (x,y,z) in the given lane; bin code kept unique. */
 	private Location bin(String lane, double x, double y, double z) {
+		return bin(warehouse(), lane, x, y, z);
+	}
+
+	private Location bin(Warehouse owner, String lane, double x, double y, double z) {
 		Location l = new Location();
-		l.setWarehouse(warehouse());
+		l.setWarehouse(owner);
 		l.setZone("Z");
 		l.setAisle("A");
 		l.setRack(lane);

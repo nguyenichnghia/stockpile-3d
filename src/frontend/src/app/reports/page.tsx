@@ -182,7 +182,7 @@ function ReportsPage() {
           <Tile
             label="Movement hôm nay"
             value={String(summary.movementsToday)}
-            sub="bút toán ledger (UTC)"
+            sub={`bút toán ledger (${summary.timezone})`}
           />
         </section>
       )}

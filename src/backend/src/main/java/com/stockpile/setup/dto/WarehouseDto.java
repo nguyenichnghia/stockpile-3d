@@ -14,9 +14,12 @@ public record WarehouseDto(
 		@NotBlank @Size(max = 255) String name,
 		/** Scan-enforcement policy; null on create means off. */
 		Boolean requireScan,
+		/** IANA zone id for reporting days; null on create means UTC. */
+		String timezone,
 		Instant createdAt) {
 
 	public static WarehouseDto from(Warehouse w) {
-		return new WarehouseDto(w.getId(), w.getCode(), w.getName(), w.isRequireScan(), w.getCreatedAt());
+		return new WarehouseDto(w.getId(), w.getCode(), w.getName(), w.isRequireScan(),
+				w.getTimezone(), w.getCreatedAt());
 	}
 }

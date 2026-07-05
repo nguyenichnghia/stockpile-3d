@@ -1,5 +1,7 @@
 package com.stockpile.setup.service;
 
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class WarehouseService {
 		warehouse.setCode(dto.code());
 		warehouse.setName(dto.name());
 		warehouse.setRequireScan(Boolean.TRUE.equals(dto.requireScan()));
+		warehouse.setTimezone(dto.timezone() == null ? "UTC" : validZone(dto.timezone()));
 		return WarehouseDto.from(warehouseRepository.save(warehouse));
 	}
 
@@ -51,7 +54,19 @@ public class WarehouseService {
 		if (patch.requireScan() != null) {
 			warehouse.setRequireScan(patch.requireScan());
 		}
+		if (patch.timezone() != null) {
+			warehouse.setTimezone(validZone(patch.timezone()));
+		}
 		return WarehouseDto.from(warehouse);
+	}
+
+	/** Normalizes an IANA zone id, rejecting unknown ones before they reach the DB. */
+	private static String validZone(String timezone) {
+		try {
+			return ZoneId.of(timezone).getId();
+		} catch (DateTimeException e) {
+			throw new IllegalArgumentException("Unknown timezone: " + timezone);
+		}
 	}
 
 	Warehouse get(Long id) {
