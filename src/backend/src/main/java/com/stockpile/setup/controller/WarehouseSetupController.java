@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.stockpile.setup.dto.WarehouseDto;
+import com.stockpile.setup.dto.WarehousePatchDto;
 import com.stockpile.setup.dto.WarehouseGenerationResult;
 import com.stockpile.setup.dto.WarehouseGridSpec;
 import com.stockpile.setup.service.WarehouseGeneratorService;
@@ -48,6 +50,12 @@ public class WarehouseSetupController {
 	public ResponseEntity<WarehouseDto> create(@Valid @RequestBody WarehouseDto dto) {
 		WarehouseDto created = warehouseService.create(dto);
 		return ResponseEntity.created(URI.create("/api/warehouses/" + created.id())).body(created);
+	}
+
+	/** Updates operating policy (e.g. scan enforcement); omitted fields stay as-is. */
+	@PatchMapping("/{id}")
+	public WarehouseDto update(@PathVariable Long id, @RequestBody WarehousePatchDto patch) {
+		return warehouseService.update(id, patch);
 	}
 
 	/** Generates a regular grid for one warehouse. Only allowed while it has no locations. */

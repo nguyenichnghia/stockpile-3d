@@ -46,14 +46,14 @@ Mỗi cách đều ghi: *cần khi nào* và *được gì / mất gì*.
 {
   "zones": 2, "aislesPerZone": 4, "racksPerAisle": 6,
   "levelsPerRack": 4, "binsPerLevel": 3,
-  "binSize":    { "w": 1.2, "d": 1.0, "h": 1.5 },  // kích thước 1 ô (mét)
-  "aisleGap":   2.0,                               // lối đi giữa 2 aisle
-  "accessFace": "SOUTH"                            // hướng lấy hàng mặc định
+  "binWidth": 1.2, "binDepth": 1.0, "binHeight": 1.5,  // kích thước 1 ô (mét)
+  "aisleGap":   2.0,                                   // lối đi giữa 2 aisle
+  "accessFace": "SOUTH"                                // hướng lấy hàng mặc định
 }
 ```
 → Sinh ra `2·4·6·4·3 = 576` bản ghi `location`, tọa độ `x/y/z` tính tự động từ chỉ số ô nhân kích thước + khoảng cách, `lane_id` gán theo `(zone, aisle, rack)` (đúng invariant "blocking cục bộ theo lane"), mã `zone/aisle/rack/level/bin` đánh số tuần tự.
 
-**Cách hiện thực:** một service `WarehouseGeneratorService` + endpoint `POST /api/warehouses/{id}/generate` (tạo kho trước bằng `POST /api/warehouses` với `{code, name}`), **hoặc** một Flyway migration/seed script cho môi trường dev. Ghi tất cả trong **một transaction** (giao dịch — hoặc thành công hết, hoặc không gì). Guard "đã có location thì từ chối" tính **theo kho đích** (ADR-0009) — kho thứ hai/ba generate bình thường khi kho đó còn trống.
+**Cách hiện thực:** một service `WarehouseGeneratorService` + endpoint `POST /api/warehouses/{id}/generate` (tạo kho trước bằng `POST /api/warehouses` với `{code, name}` — thêm `requireScan: true` nếu kho bắt buộc quét mã khi ghi movement, mặc định tắt; bật/tắt sau bằng `PATCH /api/warehouses/{id}`), **hoặc** một Flyway migration/seed script cho môi trường dev. Ghi tất cả trong **một transaction** (giao dịch — hoặc thành công hết, hoặc không gì). Guard "đã có location thì từ chối" tính **theo kho đích** (ADR-0009) — kho thứ hai/ba generate bình thường khi kho đó còn trống.
 
 | | |
 |---|---|

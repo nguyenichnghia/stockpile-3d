@@ -49,6 +49,7 @@ public class MovementService {
 			movement.setTs(Instant.now());
 		}
 		validateWarehouse(movement);
+		enforceScanPolicy(movement);
 		Movement saved = movementRepository.save(movement);
 		projectionService.apply(saved);
 		MovementRecordedEvent event = buildEvent(saved);
@@ -83,6 +84,32 @@ public class MovementService {
 		} else if (binWh != null && !m.getWarehouse().getId().equals(binWh.getId())) {
 			throw new IllegalArgumentException(
 					"warehouseId does not match the bins' warehouse (" + binWh.getCode() + ")");
+		}
+	}
+
+	/**
+	 * Server-side scan enforcement (the slice ADR-0007 left room for): when the
+	 * movement's warehouse has {@code requireScan} on, the scanRef must be the
+	 * lot's own barcode {@code LOT-{id}} — proof the right physical box was
+	 * touched. Warehouses with the flag off keep the v1 encourage-and-audit
+	 * contract: any scanRef (or none) is recorded as-is. Must run after
+	 * {@link #validateWarehouse} so the warehouse is resolved.
+	 */
+	private static void enforceScanPolicy(Movement m) {
+		if (!m.getWarehouse().isRequireScan()) {
+			return;
+		}
+		String scanRef = m.getScanRef();
+		if (scanRef == null || scanRef.isBlank()) {
+			throw new IllegalArgumentException(
+					"Warehouse " + m.getWarehouse().getCode()
+							+ " requires scan confirmation: scanRef is required");
+		}
+		String expected = "LOT-" + m.getLot().getId();
+		if (!expected.equalsIgnoreCase(scanRef.trim())) {
+			throw new IllegalArgumentException(
+					"scanRef \"" + scanRef + "\" does not match the movement's lot (expected "
+							+ expected + ")");
 		}
 	}
 

@@ -33,6 +33,14 @@ public class Warehouse {
 	@Column(nullable = false)
 	private String name;
 
+	/**
+	 * Scan-enforcement policy (ADR-0007's follow-up slice): when on, a movement
+	 * in this warehouse must carry a scanRef matching its lot barcode; when off
+	 * the ledger merely records what was scanned (encourage + audit).
+	 */
+	@Column(name = "require_scan", nullable = false)
+	private boolean requireScan = false;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 }

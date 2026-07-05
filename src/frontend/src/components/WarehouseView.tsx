@@ -29,10 +29,13 @@ import { applyDelta, connectPlacements } from "@/lib/realtime";
  */
 export default function WarehouseView({
   warehouseId,
+  requireScan,
   locations,
   placements: initialPlacements,
 }: {
   warehouseId: number;
+  /** Warehouse policy: confirming a pick step needs a lot scan (no manual fallback). */
+  requireScan: boolean;
   locations: Location[];
   placements: Placement[];
 }) {
@@ -358,6 +361,7 @@ export default function WarehouseView({
           stepIndex={stepIndex}
           busy={planBusy}
           error={planError}
+          requireScan={requireScan}
           binCodeOf={binCodeOf}
           onConfirm={confirmStep}
           onClose={closePlan}
