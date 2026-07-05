@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Fixed
+- Lỗi thiếu query param bắt buộc (ví dụ gọi `/api/placements` không kèm `warehouseId`) hoặc param sai kiểu (`warehouseId=abc`) giờ trả 400 với `message` nêu tên param, cùng shape JSON với các lỗi khác — trước đó là body mặc định của Spring không có `message` (finding từ verify PR #28); frontend vốn hiển thị `message` nên giờ báo lỗi đọc được.
+
 ### Added
 - **Enforce quét mã phía server (slice ADR-0007 chừa sẵn)** — cột `warehouse.require_scan` (Flyway `V4`, mặc định `false`): kho bật cờ thì `POST /api/movements` từ chối 400 khi `scanRef` thiếu hoặc không khớp mã lô `LOT-{lotId}` của movement (so khớp không phân biệt hoa thường, đúng pattern của resolver); kho tắt cờ giữ nguyên hợp đồng v1 "khuyến khích + audit". Áp cho **mọi** movement của kho, kể cả INBOUND staging không bin (§8.6 — mọi điểm chạm vật lý). `PATCH /api/warehouses/{id}` bật/tắt cờ (field bỏ trống giữ nguyên); `requireScan` có trong payload warehouse. Frontend: kho bắt buộc quét thì panel pick-list ẩn nút "Xác nhận không quét". Test: `ScanEnforcementTest` (Testcontainers).
 
