@@ -14,13 +14,15 @@ import type { PickPlan, PickStep } from "@/lib/api";
  * path — the scan value is recorded as the movement's scanRef, giving the
  * ledger ground truth that the right physical box was touched. A manual
  * fallback stays available but records scanRef=null, so unscanned steps remain
- * auditable.
+ * auditable — unless the warehouse enforces scanning (requireScan), in which
+ * case the backend would reject scanRef=null and the fallback is not offered.
  */
 export default function PickPlanPanel({
   plan,
   stepIndex,
   busy,
   error,
+  requireScan,
   binCodeOf,
   onConfirm,
   onClose,
@@ -30,6 +32,8 @@ export default function PickPlanPanel({
   stepIndex: number;
   busy: boolean;
   error: string | null;
+  /** Warehouse policy: when true, scanning is the only way to confirm a step. */
+  requireScan: boolean;
   binCodeOf: (binId: number) => string;
   /** Confirm the current step; scanRef is the scanned code, or null if manual. */
   onConfirm: (scanRef: string | null) => void;
@@ -134,6 +138,7 @@ export default function PickPlanPanel({
           stepNumber={stepIndex + 1}
           stepTotal={plan.steps.length}
           busy={busy}
+          requireScan={requireScan}
           onConfirm={onConfirm}
         />
       )}
@@ -143,19 +148,23 @@ export default function PickPlanPanel({
 
 /**
  * Scan-to-confirm for one step: the operator scans the lot barcode; only the
- * expected code confirms. The manual fallback confirms with scanRef=null.
+ * expected code confirms. The manual fallback confirms with scanRef=null —
+ * hidden when the warehouse enforces scanning, since the backend would reject
+ * the movement anyway.
  */
 function ScanConfirm({
   step,
   stepNumber,
   stepTotal,
   busy,
+  requireScan,
   onConfirm,
 }: {
   step: PickStep;
   stepNumber: number;
   stepTotal: number;
   busy: boolean;
+  requireScan: boolean;
   onConfirm: (scanRef: string | null) => void;
 }) {
   const [scan, setScan] = useState("");
@@ -210,23 +219,30 @@ function ScanConfirm({
           {busy ? "…" : `Quét bước ${stepNumber}/${stepTotal}`}
         </button>
       </form>
-      {/* Fallback without a scanner: still confirms, but scanRef stays null. */}
-      <button
-        type="button"
-        onClick={() => onConfirm(null)}
-        disabled={busy}
-        style={{
-          padding: "5px 12px",
-          borderRadius: 6,
-          border: "1px solid #33406b",
-          background: "transparent",
-          color: "#9fb0d8",
-          fontSize: 12,
-          cursor: "pointer",
-        }}
-      >
-        Xác nhận không quét
-      </button>
+      {/* Fallback without a scanner: still confirms, but scanRef stays null.
+          Not offered when the warehouse enforces scanning. */}
+      {requireScan ? (
+        <p style={{ margin: 0, color: "#9fb0d8", fontSize: 12 }}>
+          Kho này bắt buộc quét mã để xác nhận.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onConfirm(null)}
+          disabled={busy}
+          style={{
+            padding: "5px 12px",
+            borderRadius: 6,
+            border: "1px solid #33406b",
+            background: "transparent",
+            color: "#9fb0d8",
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
+          Xác nhận không quét
+        </button>
+      )}
     </>
   );
 }

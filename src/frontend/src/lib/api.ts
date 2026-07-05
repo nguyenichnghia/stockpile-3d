@@ -10,6 +10,8 @@ export type Warehouse = {
   id: number;
   code: string;
   name: string;
+  /** When on, the backend rejects movements without a matching lot scan (ADR-0007). */
+  requireScan: boolean;
   createdAt: string;
 };
 

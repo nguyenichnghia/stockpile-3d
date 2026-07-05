@@ -9,6 +9,7 @@ import com.stockpile.common.NotFoundException;
 import com.stockpile.inventory.domain.Warehouse;
 import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.setup.dto.WarehouseDto;
+import com.stockpile.setup.dto.WarehousePatchDto;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,7 +41,17 @@ public class WarehouseService {
 		Warehouse warehouse = new Warehouse();
 		warehouse.setCode(dto.code());
 		warehouse.setName(dto.name());
+		warehouse.setRequireScan(Boolean.TRUE.equals(dto.requireScan()));
 		return WarehouseDto.from(warehouseRepository.save(warehouse));
+	}
+
+	@Transactional
+	public WarehouseDto update(Long id, WarehousePatchDto patch) {
+		Warehouse warehouse = get(id);
+		if (patch.requireScan() != null) {
+			warehouse.setRequireScan(patch.requireScan());
+		}
+		return WarehouseDto.from(warehouse);
 	}
 
 	Warehouse get(Long id) {

@@ -126,6 +126,7 @@ export default async function Home({
         <WarehouseView
           key={selected.id}
           warehouseId={selected.id}
+          requireScan={selected.requireScan}
           locations={locations}
           placements={placements}
         />
