@@ -79,6 +79,23 @@ class InventoryApiTest {
 	}
 
 	@Test
+	void missingRequiredParamReturns400WithMessage() throws Exception {
+		// The frontend surfaces {message}; Spring's default body has none.
+		mvc.perform(get("/api/placements"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(
+						org.hamcrest.Matchers.containsString("warehouseId")));
+	}
+
+	@Test
+	void nonNumericParamReturns400WithMessage() throws Exception {
+		mvc.perform(get("/api/placements").param("warehouseId", "abc"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(
+						org.hamcrest.Matchers.containsString("warehouseId")));
+	}
+
+	@Test
 	void createSkuWithBlankCodeReturns400() throws Exception {
 		String bad = """
 				{"code":"","name":"x","w":1,"d":1,"h":1,"weight":1,"handling":"FIFO"}""";
