@@ -47,6 +47,9 @@ services:
       args:
         # Trình duyệt người dùng gọi backend qua localhost (cổng đã publish).
         NEXT_PUBLIC_API_URL: http://localhost:8080
+    environment:
+      # Code chạy TRONG CONTAINER (server component) gọi backend qua tên service.
+      API_URL_INTERNAL: http://backend:8080
     ports:
       - "3000:3000"
     depends_on:

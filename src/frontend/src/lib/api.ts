@@ -3,7 +3,16 @@
 // write (`recordMovement`) is the user *confirming* an engine-proposed step —
 // the scene itself never initiates a change.
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// Server-side code (React Server Components) runs inside the frontend
+// container, where the backend is reachable by its Docker service name, not
+// localhost. API_URL_INTERNAL is read at runtime (not a NEXT_PUBLIC_* var, so
+// it is NOT inlined at build time); the browser keeps the public URL.
+const BASE_URL =
+  typeof window === "undefined"
+    ? (process.env.API_URL_INTERNAL ??
+        process.env.NEXT_PUBLIC_API_URL ??
+        "http://localhost:8080")
+    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080");
 
 /** A physical warehouse site (ADR-0009); every read below is scoped to one. */
 export type Warehouse = {
