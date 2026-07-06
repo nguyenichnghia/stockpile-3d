@@ -20,17 +20,28 @@ import com.stockpile.relocation.service.BlockingGraph;
 import com.stockpile.relocation.service.LotBox;
 import com.stockpile.setup.service.WarehouseGeneratorService;
 import com.stockpile.setup.dto.WarehouseGridSpec;
+import com.stockpile.whatif.dto.PutawayWeightsDto;
+import com.stockpile.whatif.dto.WhatIfPolicyResult;
 import com.stockpile.whatif.dto.WhatIfResult;
 import com.stockpile.whatif.dto.WhatIfResult.LayoutMetrics;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Layout what-if (ADR-0008): builds a hypothetical grid in memory, re-puts
- * every currently placed lot into it with the same SLAP scorer the putaway
- * engine uses, and measures both layouts with the same blocking rules the
- * scene uses. Pure composition of existing cores — nothing is persisted, no
- * ledger entries, no events.
+ * What-if simulations (ADR-0008): re-put every currently placed lot into a set
+ * of empty bins with the same SLAP scorer the putaway engine uses, and measure
+ * the result with the same blocking rules the scene uses. Pure composition of
+ * existing cores — nothing is persisted, no ledger entries, no events.
+ *
+ * <p>Two flavors share the {@link #simulatePutaway} core:
+ * <ul>
+ *   <li><b>Layout</b> ({@link #simulate}) — vary the bins: fill a hypothetical
+ *       grid, keeping the (default) weights, to see if a different rack shape
+ *       helps.
+ *   <li><b>Policy</b> ({@link #simulatePolicy}) — vary the weights: keep the
+ *       warehouse's real bins and fill them twice, with baseline vs candidate
+ *       weights, to isolate the effect of the SLAP cost trade-offs.
+ * </ul>
  *
  * <p>Simulated putaway order is expiry-first (nulls last, id as tiebreaker):
  * deterministic and FEFO-friendly, standing in for the unknowable real arrival
@@ -65,8 +76,26 @@ public class WhatIfService {
 			grid.get(i).setId((long) -(i + 1));
 		}
 
-		LayoutMetrics simulated = simulatePutaway(placements, grid);
+		LayoutMetrics simulated = simulatePutaway(placements, grid, weights);
 		return new WhatIfResult(current, simulated);
+	}
+
+	/**
+	 * Policy what-if: hold the warehouse's real bins fixed and re-fill them twice
+	 * — with the configured baseline weights, then with candidate weights merged
+	 * onto that baseline. Any metric difference is the weights' doing. The bins
+	 * are cleared for the simulation (the current occupancy is irrelevant); it is
+	 * the placement it *would* reach, not where lots physically sit.
+	 */
+	@Transactional(readOnly = true)
+	public WhatIfPolicyResult simulatePolicy(Long warehouseId, PutawayWeightsDto candidateSpec) {
+		List<Placement> placements = placementRepository.findByBin_WarehouseId(warehouseId);
+		List<Location> bins = locationRepository.findByWarehouseId(warehouseId);
+		PutawayWeights candidate = candidateSpec.merge(weights);
+
+		LayoutMetrics baseline = simulatePutaway(placements, bins, weights);
+		LayoutMetrics candidateMetrics = simulatePutaway(placements, bins, candidate);
+		return new WhatIfPolicyResult(baseline, candidateMetrics, weights, candidate);
 	}
 
 	/** Metrics of the warehouse as it physically stands. */
@@ -86,8 +115,9 @@ public class WhatIfService {
 				avgDist);
 	}
 
-	/** Greedy SLAP putaway of every lot into the empty hypothetical grid. */
-	private LayoutMetrics simulatePutaway(List<Placement> placements, List<Location> grid) {
+	/** Greedy SLAP putaway of every lot into the empty {@code grid} with {@code w}. */
+	private static LayoutMetrics simulatePutaway(
+			List<Placement> placements, List<Location> grid, PutawayWeights w) {
 		List<Lot> lots = placements.stream()
 				.map(Placement::getLot)
 				.sorted(Comparator
@@ -109,7 +139,7 @@ public class WhatIfService {
 					continue;
 				}
 				double score = PutawayScorer.score(lot, bin,
-						laneLots.getOrDefault(bin.getLaneId(), List.of()), weights);
+						laneLots.getOrDefault(bin.getLaneId(), List.of()), w);
 				if (score < bestScore) {
 					bestScore = score;
 					best = bin;
