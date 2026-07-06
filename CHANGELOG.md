@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Fixed
+- Trang chủ chạy qua Docker Compose luôn báo "Backend chưa sẵn sàng": fetch của server component chạy *bên trong* container frontend, nơi `localhost:8080` trỏ về chính nó chứ không phải backend. `api.ts` giờ phân biệt nơi chạy — phía server ưu tiên `API_URL_INTERNAL` (env runtime, compose đặt `http://backend:8080`), phía trình duyệt giữ `NEXT_PUBLIC_API_URL`. Chạy dev trên máy thật không đổi hành vi (fallback như cũ).
+
 ## [1.1.0] - 2026-07-06
 Sau v1.0.0 (hoàn tất roadmap): các slice mở rộng — enforce quét phía server, timezone kho cho báo cáo, what-if theo chính sách, và **chuyển kho** (mục cuối ADR-0009 chừa lại).
 
