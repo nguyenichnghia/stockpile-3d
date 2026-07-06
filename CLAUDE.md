@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Current state: full roadmap (phases 1–4) complete, incl. multi-warehouse (tags v0.1.0 → v1.0.0)
+## Current state: full roadmap (phases 1–4) complete + post-roadmap slices (tags v0.1.0 → v1.1.0)
 
 This is **no longer documentation-only** — a working backend and frontend exist. Do not run `git init`, recreate the folder structure, or treat the layout as merely a *target* — it exists.
 
