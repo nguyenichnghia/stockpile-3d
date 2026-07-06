@@ -85,11 +85,12 @@ Code blocking dùng overlap khoảng (`min1 < max2 && min2 < max1`) trên từng
 
 ---
 
-## 7. API & Realtime (Phase 3 sắp tới)
+## 7. API & Realtime (đã chạy trong dự án — học để hiểu sâu)
 
 - [ ] [restfulapi.net](https://restfulapi.net/) — method + status code (200/201/404/400)
 - [ ] [Swagger/OpenAPI docs](https://swagger.io/docs/) — dự án có springdoc
-- [ ] ⭐ **WebSocket** ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API) + [Spring guide](https://spring.io/guides/gs/messaging-stomp-websocket/)) — **Phase 3**: đẩy delta realtime tới 3D scene
+- [ ] ⭐ **WebSocket** ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API) + [Spring guide](https://spring.io/guides/gs/messaging-stomp-websocket/)) — dự án *đã* đẩy delta realtime tới 3D scene qua STOMP (ADR-0005); học để giải thích được cái đang chạy
+- 🔗 Đọc lại: [realtime.ts](../src/frontend/src/lib/realtime.ts) + package [com.stockpile.realtime](../src/backend/src/main/java/com/stockpile/realtime/)
 
 ---
 
@@ -102,15 +103,31 @@ Code blocking dùng overlap khoảng (`min1 < max2 && min2 < max1`) trên từng
 
 ---
 
+## 8b. Frontend — Next.js & môi trường chạy (code chạy ở đâu?)
+
+Cụm này sinh ra từ bug thật (Dev Log 2026-07-06 — "Backend chưa sẵn sàng" khi chạy compose): cùng một file code có thể chạy ở server (trong container) hoặc trong trình duyệt, và `localhost` / biến môi trường mang nghĩa khác nhau ở mỗi nơi.
+
+- [ ] ⭐ [Next.js Learn](https://nextjs.org/learn) — khóa chính thức; quan trọng nhất: các chương **Server vs Client Components**
+- [ ] ⭐ [Next.js — Environment Variables](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables) — biến `NEXT_PUBLIC_*` bị nướng vào bundle lúc build (build-time inlining), biến thường đọc lúc runtime
+- [ ] [webpack — DefinePlugin](https://webpack.js.org/plugins/define-plugin/) — cơ chế tìm-và-thay đứng sau inlining; bundler nào cũng có (esbuild: `define`, Vite: `import.meta.env`)
+- [ ] ⭐ [Networking in Compose](https://docs.docker.com/compose/how-tos/networking/) — service gọi nhau bằng **tên service** (DNS nội bộ); `localhost` chỉ đúng cho code đứng trên máy đã publish cổng (bổ sung cho §5)
+- [ ] [The Missing Semester (MIT)](https://missing.csail.mit.edu/) — tiến trình & biến môi trường, nền của tất cả
+- 🔗 Đọc lại: [api.ts](../src/frontend/src/lib/api.ts) (BASE_URL hai nhánh server/browser), [docker-compose.yml](../docker-compose.yml) (`build.args` vs `environment`)
+- 💡 Tự kiểm tra: giải thích được vì sao đổi `NEXT_PUBLIC_API_URL` trong `environment:` rồi restart *không* có tác dụng
+
+---
+
 ## 9. Mở rộng (khi đi làm / dự án lớn)
+
+Roadmap 4 giai đoạn đã xong (v1.1.0) — các mục dưới chỉ cần đến nếu dự án vượt scope hiện tại:
 
 | Công nghệ | Khi nào cần |
 |---|---|
-| Redis (cache/lock) | Optimistic lock trên `bin` (Phase 3) |
+| Redis (cache/lock) | Optimistic lock trên `bin` khi nhiều client ghi đồng thời |
 | Message queue (Kafka/RabbitMQ) | Ledger stream tới nhiều consumer |
-| Kubernetes | Deploy nhiều service (Phase 4) |
+| Kubernetes | Deploy nhiều service ở quy mô lớn hơn compose |
 | Nginx / reverse proxy | Frontend + backend chung domain (tránh CORS) |
-| PostGIS | Spatial index toàn cục (ADR-0002 đã quyết *chưa* dùng) |
+| PostGIS | Spatial index toàn cục (ADR-0002 đã quyết *chưa* dùng; ADR-0009 giữ nguyên) |
 
 ---
 
@@ -122,7 +139,7 @@ Code blocking dùng overlap khoảng (`min1 < max2 && min2 < max1`) trên từng
 | 2–3 | Graph (topo sort, DFS) + Greedy (§1) | Hiểu CRP — phần giá trị nhất |
 | 3–4 | Event Sourcing + Spring JPA (§2, §3) | Hiểu kiến trúc ledger/projection |
 | 4–5 | SQL (§4) + Docker/Compose (§5) | Kỹ năng nền backend + deploy |
-| 5–6 | Git nâng cao (§6) + WebSocket (§7) | Quy trình + chuẩn bị Phase 3 |
-| 6+ | Heap + Three.js (§1, §8) | SLAP scoring + 3D viewer |
+| 5–6 | Git nâng cao (§6) + WebSocket (§7) | Quy trình + hiểu realtime layer đã chạy |
+| 6+ | Heap + Three.js + Next.js runtime (§1, §8, §8b) | SLAP scoring + 3D viewer + code chạy ở đâu |
 
 > **Ưu tiên nếu ít thời gian** (mục tiêu hiểu dự án + intern backend): SQL → Docker/Compose → Git nâng cao → WebSocket. 3D để cuối (lớp trình bày, không phải lõi giá trị).
