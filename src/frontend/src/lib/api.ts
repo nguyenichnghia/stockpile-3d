@@ -274,3 +274,35 @@ export type WhatIfResult = { current: LayoutMetrics; simulated: LayoutMetrics };
  */
 export const simulateLayout = (warehouseId: number, spec: GridSpec) =>
   postJson<WhatIfResult>(`/api/whatif/layout?warehouseId=${warehouseId}`, spec);
+
+/** The four SLAP cost weights (docs/01 §8.2); lower total score = better slot. */
+export type PutawayWeights = {
+  distToDock: number;
+  blockingPenalty: number;
+  retrievalMisalignment: number;
+  fitPenalty: number;
+};
+
+/** A partial weight spec for a policy what-if; omit a field to keep its default. */
+export type PutawayWeightsInput = Partial<PutawayWeights>;
+
+export type WhatIfPolicyResult = {
+  baseline: LayoutMetrics;
+  candidate: LayoutMetrics;
+  baselineWeights: PutawayWeights;
+  candidateWeights: PutawayWeights;
+};
+
+/**
+ * Simulates re-putting one warehouse's stock into its *own* bins twice — with
+ * the baseline SLAP weights and with the candidate ones — so the layout is held
+ * fixed and only the weights vary. Side-effect free despite the POST.
+ */
+export const simulatePolicy = (
+  warehouseId: number,
+  weights: PutawayWeightsInput,
+) =>
+  postJson<WhatIfPolicyResult>(
+    `/api/whatif/policy?warehouseId=${warehouseId}`,
+    weights,
+  );

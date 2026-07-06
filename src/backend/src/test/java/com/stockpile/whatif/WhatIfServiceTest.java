@@ -28,6 +28,8 @@ import com.stockpile.inventory.repository.SkuRepository;
 import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
 import com.stockpile.setup.dto.WarehouseGridSpec;
+import com.stockpile.whatif.dto.PutawayWeightsDto;
+import com.stockpile.whatif.dto.WhatIfPolicyResult;
 import com.stockpile.whatif.dto.WhatIfResult;
 import com.stockpile.whatif.service.WhatIfService;
 
@@ -97,6 +99,58 @@ class WhatIfServiceTest {
 	}
 
 	@Test
+	void policyWeightsChangeWhereLotsLandOnTheSameBins() {
+		// Two lots, four real bins: a two-high column near the dock (0,0,0)+(0,0,1)
+		// in one lane, and two flat bins far away in another lane. The layout is
+		// fixed; only the weights differ between the two runs.
+		Sku sku = sku("SHIRT");
+		putaway(lot(sku), bin("near", 0, 0, 0));
+		putaway(lot(sku), bin("near", 0, 0, 1));
+		bin("far", 8, 0, 0);
+		bin("far", 9, 0, 0);
+
+		// Candidate 1: blocking is very expensive, distance cheap -> spread the two
+		// lots so neither buries the other.
+		WhatIfPolicyResult avoidStacking = whatIfService.simulatePolicy(
+				warehouse().getId(), weights(0.1, 1000.0, null, null));
+		// Candidate 2: blocking almost free, distance dominates -> both crowd the
+		// near column, stacking one on the other.
+		WhatIfPolicyResult crowdDock = whatIfService.simulatePolicy(
+				warehouse().getId(), weights(1000.0, 0.01, null, null));
+
+		// Same stock, same bins, both fully placed either way.
+		assertThat(avoidStacking.candidate().placedLots()).isEqualTo(2);
+		assertThat(crowdDock.candidate().placedLots()).isEqualTo(2);
+
+		// The weights are what move the outcome.
+		assertThat(avoidStacking.candidate().blockedLots()).isZero();
+		assertThat(crowdDock.candidate().blockedLots()).isEqualTo(1);
+		assertThat(crowdDock.candidate().avgDistToDock())
+				.isLessThan(avoidStacking.candidate().avgDistToDock());
+	}
+
+	@Test
+	void policyBaselineIsTheConfiguredDefaultAndEchoesWeights() {
+		Sku sku = sku("SHIRT");
+		putaway(lot(sku), bin("L1", 0, 0, 0));
+
+		// A null field keeps the baseline value; only blockingPenalty is overridden.
+		WhatIfPolicyResult r = whatIfService.simulatePolicy(
+				warehouse().getId(), weights(null, 42.0, null, null));
+
+		// Both runs use the same real bins, so bin count matches and equals the
+		// warehouse's location count.
+		assertThat(r.baseline().bins()).isEqualTo(r.candidate().bins()).isEqualTo(1);
+		assertThat(r.baseline().placedLots()).isEqualTo(1);
+
+		// Baseline weights are the app defaults; candidate keeps them except the
+		// one overridden term.
+		assertThat(r.candidateWeights().blockingPenalty()).isEqualTo(42.0);
+		assertThat(r.candidateWeights().distToDock()).isEqualTo(r.baselineWeights().distToDock());
+		assertThat(r.candidateWeights().fitPenalty()).isEqualTo(r.baselineWeights().fitPenalty());
+	}
+
+	@Test
 	void oversizedGridIsRejected() {
 		assertThatThrownBy(() -> whatIfService.simulate(warehouse().getId(),
 				new WarehouseGridSpec(100, 100, 100, 10, 10,
@@ -130,11 +184,16 @@ class WhatIfServiceTest {
 	}
 
 	private Location bin(double x, double y, double z) {
+		return bin("Z-A-R", x, y, z);
+	}
+
+	/** A 1×1×1 bin at (x,y,z) in the named lane; bin code kept unique. */
+	private Location bin(String lane, double x, double y, double z) {
 		Location l = new Location();
 		l.setWarehouse(warehouse());
 		l.setZone("Z");
 		l.setAisle("A");
-		l.setRack("R");
+		l.setRack(lane);
 		l.setLevel(String.valueOf((int) z));
 		l.setBin("B-" + System.nanoTime());
 		l.setX(BigDecimal.valueOf(x));
@@ -143,9 +202,15 @@ class WhatIfServiceTest {
 		l.setW(BigDecimal.ONE);
 		l.setD(BigDecimal.ONE);
 		l.setH(BigDecimal.ONE);
-		l.setLaneId("Z-A-R");
+		l.setLaneId(lane);
 		l.setAccessFace(AccessFace.TOP);
 		return locationRepository.save(l);
+	}
+
+	/** Partial weight spec for a policy what-if; nulls keep the baseline. */
+	private static PutawayWeightsDto weights(
+			Double dist, Double blocking, Double retrieval, Double fit) {
+		return new PutawayWeightsDto(dist, blocking, retrieval, fit);
 	}
 
 	private Lot lot(Sku sku) {

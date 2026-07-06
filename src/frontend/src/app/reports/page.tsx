@@ -9,9 +9,13 @@ import {
   fetchReportSummary,
   fetchWarehouses,
   simulateLayout,
+  simulatePolicy,
   type MovementDaily,
+  type PutawayWeights,
+  type PutawayWeightsInput,
   type ReportSummary,
   type Warehouse,
+  type WhatIfPolicyResult,
   type WhatIfResult,
 } from "@/lib/api";
 
@@ -190,6 +194,8 @@ function ReportsPage() {
       {rows && <ThroughputChart rows={rows} />}
 
       {summary && selected && <WhatIfSection warehouseId={selected.id} />}
+
+      {summary && selected && <PolicyWhatIfSection warehouseId={selected.id} />}
     </main>
   );
 }
@@ -343,6 +349,152 @@ function WhatIfSection({ warehouseId }: { warehouseId: number }) {
               label="Khoảng cách tới dock (TB)"
               a={result.current.avgDistToDock}
               b={result.simulated.avgDistToDock}
+              fmt={(v) => v.toFixed(2) + " m"}
+              lowerIsBetter
+            />
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+/** The four SLAP weight fields, in scoring order. */
+const WEIGHT_FIELDS: [keyof PutawayWeights, string][] = [
+  ["distToDock", "Gần dock"],
+  ["blockingPenalty", "Phạt bị chặn"],
+  ["retrievalMisalignment", "Lệch tầm lấy"],
+  ["fitPenalty", "Phí thừa chỗ"],
+];
+
+/**
+ * Policy what-if: keep the warehouse's real bins and re-fill them with a
+ * different set of SLAP weights, comparing the outcome against the configured
+ * baseline (backend simulation, nothing persisted). A blank field keeps the
+ * baseline weight for that term, so one weight can be varied in isolation.
+ */
+function PolicyWhatIfSection({ warehouseId }: { warehouseId: number }) {
+  // Empty string = "unset" = keep the baseline weight for that term.
+  const [weights, setWeights] = useState<Record<string, string>>({});
+  const [result, setResult] = useState<WhatIfPolicyResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const input: PutawayWeightsInput = {};
+      for (const [key] of WEIGHT_FIELDS) {
+        const raw = weights[key];
+        if (raw !== undefined && raw !== "") input[key] = Number(raw);
+      }
+      setResult(await simulatePolicy(warehouseId, input));
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof Error ? err.message : "Lỗi mô phỏng");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section
+      aria-label="Mô phỏng what-if theo chính sách"
+      style={{
+        marginTop: 24,
+        background: SURFACE,
+        border: "1px solid #33406b",
+        borderRadius: 8,
+        padding: 16,
+        maxWidth: 900,
+      }}
+    >
+      <h2 style={{ margin: "0 0 4px", fontSize: 14 }}>What-if · thử bộ trọng số SLAP khác</h2>
+      <p style={{ margin: "0 0 12px", color: INK_MUTED, fontSize: 12 }}>
+        Giữ nguyên các ô hiện có, xếp lại toàn bộ lô bằng bộ trọng số thử nghiệm
+        rồi so với trọng số mặc định — cô lập tác động của chính sách SLAP, không
+        đổi layout. Bỏ trống một ô để giữ giá trị mặc định của trọng số đó.
+      </p>
+
+      <form onSubmit={run} style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+        {WEIGHT_FIELDS.map(([key, label]) => (
+          <label key={key} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: INK_2 }}>
+            {label}
+            <input
+              type="number"
+              min={0}
+              step="0.1"
+              value={weights[key] ?? ""}
+              placeholder={result ? String(result.baselineWeights[key]) : "mặc định"}
+              onChange={(e) => setWeights((w) => ({ ...w, [key]: e.target.value }))}
+              style={{
+                width: 96,
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "1px solid #33406b",
+                background: "#0b1020",
+                color: INK,
+                fontSize: 13,
+              }}
+            />
+          </label>
+        ))}
+        <button
+          type="submit"
+          disabled={busy}
+          style={{
+            padding: "7px 14px",
+            borderRadius: 6,
+            border: "1px solid #33406b",
+            background: "#5b6cff",
+            color: "#fff",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          {busy ? "…" : "Mô phỏng"}
+        </button>
+      </form>
+
+      {error && <p style={{ color: SERIOUS, fontSize: 13 }}>{error}</p>}
+
+      {result && (
+        <table
+          style={{
+            marginTop: 14,
+            borderCollapse: "collapse",
+            fontSize: 13,
+            color: INK,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, textAlign: "left" }}>Chỉ số</th>
+              <th style={thStyle}>Mặc định</th>
+              <th style={thStyle}>Thử nghiệm</th>
+            </tr>
+          </thead>
+          <tbody>
+            <CompareRow label="Lô xếp được" a={result.baseline.placedLots} b={result.candidate.placedLots} />
+            <CompareRow
+              label="Lô không còn chỗ"
+              a={result.baseline.unplacedLots}
+              b={result.candidate.unplacedLots}
+              lowerIsBetter
+            />
+            <CompareRow
+              label="Lô bị chặn"
+              a={result.baseline.blockedLots}
+              b={result.candidate.blockedLots}
+              lowerIsBetter
+            />
+            <CompareRow
+              label="Khoảng cách tới dock (TB)"
+              a={result.baseline.avgDistToDock}
+              b={result.candidate.avgDistToDock}
               fmt={(v) => v.toFixed(2) + " m"}
               lowerIsBetter
             />
