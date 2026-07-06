@@ -2,6 +2,14 @@
 
 > Nhật ký vấn đề gặp phải + nguyên nhân + cách giải, viết cho chính mình (theo [03-documentation.md](./03-documentation.md) §5). Mới nhất ở trên.
 
+## 2026-07-06 — Trang chủ qua Docker Compose luôn báo "Backend chưa sẵn sàng" dù backend healthy
+
+- **Vấn đề:** chạy trọn bộ bằng `docker compose up`, backend log `Started ... in 9.257 seconds`, `curl localhost:8080/api/warehouses` từ máy thật trả 200, WebSocket/STOMP từ trình duyệt vẫn kết nối được — nhưng trang chủ (`localhost:3000`) luôn render "Backend chưa sẵn sàng". Nghịch lý: API "chết" mà realtime "sống", cùng trỏ `localhost:8080`.
+- **Nguyên nhân:** `page.tsx` là **React Server Component** — `fetchWarehouses()` chạy **bên trong container frontend**, không phải trong trình duyệt. `api.ts` chỉ có một `BASE_URL = http://localhost:8080` dùng chung; mà `localhost` là khái niệm *tương đối theo nơi đứng gọi*: từ trình duyệt → máy Windows (cổng đã publish, OK), từ trong container frontend → chính container đó, không có gì nghe cổng 8080 → `Connection refused`. Xác nhận bằng `docker compose exec frontend wget http://localhost:8080/...` (refused) vs `wget http://backend:8080/...` (OK). Bug không lộ khi dev bằng `npm run dev` vì khi đó Next.js server nằm ngay trên máy thật — `localhost:8080` tình cờ đúng cho cả hai phía.
+- **Đã sửa:** `api.ts` phân biệt nơi chạy bằng `typeof window === "undefined"`: phía server ưu tiên biến runtime mới `API_URL_INTERNAL` (compose đặt `http://backend:8080` trong `environment`), phía trình duyệt giữ `NEXT_PUBLIC_API_URL`. Fallback giữ nguyên nên `npm run dev` không cần cấu hình thêm. Lưu ý then chốt: `API_URL_INTERNAL` cố ý **không** mang tiền tố `NEXT_PUBLIC_` — biến `NEXT_PUBLIC_*` bị Next.js **nướng cứng vào bundle lúc build** (nên phải truyền qua `build.args`), còn biến thường được đọc **lúc runtime** (truyền qua `environment`, đổi không cần build lại).
+- **Học được:** trong Docker network, service gọi nhau bằng **tên service** (như backend vẫn nối `postgres:5432`), `localhost` chỉ đúng cho code đứng trên máy đã publish cổng. Với Next.js, phải luôn hỏi "đoạn fetch này chạy ở đâu?" — server component và client component *cùng import một file* nhưng đứng ở hai máy khác nhau. Và một bài học lặp lại từ entry LazyInit cùng ngày: **test/dev xanh không chứng minh deploy chạy** — lớp bug "chỉ tồn tại ở môi trường thật" chỉ lộ khi chạy đúng cấu hình thật.
+
+
 ## 2026-07-06 — Transfer trả `LazyInitializationException` dù test xanh
 
 - **Vấn đề:** `TransferServiceTest` (Testcontainers) xanh 7/7, nhưng gọi `POST /api/transfers` thật thì trả **HTTP 500** `LazyInitializationException: Could not initialize proxy [Sku#1] - no session`. Lạ hơn: OUTBOUND *đã* ghi (lô rời kho A), chỉ bước map response mới nổ.
