@@ -5,15 +5,21 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
+  binCode,
+  fetchIncomingTransfers,
+  fetchLocations,
   fetchMovementsDaily,
   fetchReportSummary,
   fetchWarehouses,
+  receiveTransfer,
   simulateLayout,
   simulatePolicy,
+  type Location,
   type MovementDaily,
   type PutawayWeights,
   type PutawayWeightsInput,
   type ReportSummary,
+  type Transfer,
   type Warehouse,
   type WhatIfPolicyResult,
   type WhatIfResult,
@@ -193,10 +199,138 @@ function ReportsPage() {
 
       {rows && <ThroughputChart rows={rows} />}
 
+      {summary && selected && <IncomingTransfersSection warehouseId={selected.id} />}
+
       {summary && selected && <WhatIfSection warehouseId={selected.id} />}
 
       {summary && selected && <PolicyWhatIfSection warehouseId={selected.id} />}
     </main>
+  );
+}
+
+/**
+ * Cross-warehouse transfers arriving at this warehouse (ADR-0010): lots that
+ * have left their source and are in transit. Receiving one records the INBOUND
+ * into a chosen bin — the lot then appears in this warehouse's 3D scene. The
+ * source warehouse's OUTBOUND is already on the ledger; nothing here mutates the
+ * scene directly (the backend applies the projection and pushes the delta).
+ */
+function IncomingTransfersSection({ warehouseId }: { warehouseId: number }) {
+  const [transfers, setTransfers] = useState<Transfer[] | null>(null);
+  const [bins, setBins] = useState<Location[]>([]);
+  const [target, setTarget] = useState<Record<number, string>>({});
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function reload() {
+    fetchIncomingTransfers(warehouseId)
+      .then(setTransfers)
+      .catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải danh sách chuyển kho"));
+  }
+
+  useEffect(() => {
+    reload();
+    fetchLocations(warehouseId).then(setBins).catch(() => setBins([]));
+    // reload is stable per warehouseId; deps intentionally just the id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouseId]);
+
+  async function receive(t: Transfer) {
+    const binId = Number(target[t.id]);
+    if (!binId) {
+      setError("Chọn ô đích trước khi nhận");
+      return;
+    }
+    setBusy(t.id);
+    setError(null);
+    try {
+      await receiveTransfer(t.id, binId);
+      reload(); // the received one drops off the in-transit list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi nhận hàng");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Nothing arriving: keep the dashboard uncluttered.
+  if (transfers != null && transfers.length === 0) return null;
+
+  return (
+    <section
+      aria-label="Hàng đang chuyển đến"
+      style={{
+        marginTop: 24,
+        background: SURFACE,
+        border: "1px solid #33406b",
+        borderRadius: 8,
+        padding: 16,
+        maxWidth: 900,
+      }}
+    >
+      <h2 style={{ margin: "0 0 4px", fontSize: 14 }}>Hàng đang chuyển đến kho này</h2>
+      <p style={{ margin: "0 0 12px", color: INK_MUTED, fontSize: 12 }}>
+        Lô đã rời kho nguồn và đang trên đường (ADR-0010). Chọn ô đích rồi bấm
+        Nhận để ghi INBOUND — lô sẽ xuất hiện trong kho 3D.
+      </p>
+
+      {error && <p style={{ color: SERIOUS, fontSize: 13 }}>{error}</p>}
+
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+        {transfers?.map((t) => (
+          <li
+            key={t.id}
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+              fontSize: 13,
+              color: INK,
+            }}
+          >
+            <span>
+              Lô #{t.lotId} ({t.skuCode}) — từ kho #{t.fromWarehouseId}
+            </span>
+            <select
+              value={target[t.id] ?? ""}
+              onChange={(e) => setTarget((m) => ({ ...m, [t.id]: e.target.value }))}
+              style={{
+                padding: "5px 8px",
+                borderRadius: 6,
+                border: "1px solid #33406b",
+                background: "#0b1020",
+                color: INK,
+                fontSize: 13,
+              }}
+            >
+              <option value="">Chọn ô đích…</option>
+              {bins.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {binCode(b)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => receive(t)}
+              disabled={busy === t.id}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 6,
+                border: "1px solid #33406b",
+                background: "#5b6cff",
+                color: "#fff",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              {busy === t.id ? "…" : "Nhận"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

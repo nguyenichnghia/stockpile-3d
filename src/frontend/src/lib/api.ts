@@ -306,3 +306,29 @@ export const simulatePolicy = (
     `/api/whatif/policy?warehouseId=${warehouseId}`,
     weights,
   );
+
+/**
+ * A cross-warehouse transfer (ADR-0010): a lot moving from one warehouse to
+ * another as a linked OUTBOUND + INBOUND. While IN_TRANSIT the lot has left the
+ * source and has no placement in either scene until received.
+ */
+export type Transfer = {
+  id: number;
+  lotId: number;
+  skuCode: string;
+  fromWarehouseId: number;
+  toWarehouseId: number;
+  status: "IN_TRANSIT" | "COMPLETED";
+  outboundMovementId: number;
+  inboundMovementId: number | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+/** In-transit transfers arriving at the given warehouse (the "đang chuyển" list). */
+export const fetchIncomingTransfers = (toWarehouseId: number) =>
+  getJson<Transfer[]>(`/api/transfers?toWarehouseId=${toWarehouseId}`);
+
+/** Receives an in-transit transfer into a bin of its destination warehouse. */
+export const receiveTransfer = (transferId: number, toBinId: number) =>
+  postJson<Transfer>(`/api/transfers/${transferId}/receive`, { toBinId });
