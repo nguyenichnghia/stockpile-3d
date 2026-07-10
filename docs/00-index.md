@@ -17,7 +17,7 @@
 | 3 | [Data model](./data-model.md) | 5 bảng: từng cột/ràng buộc/index + **lý do thiết kế** + vòng đời dữ liệu | Hiểu dữ liệu được lưu thế nào |
 | 4 | [Kiến trúc hệ thống](./architecture.md) | 3 tầng, luồng dữ liệu (write/read/decision), invariant, NFR, **API reference**, deploy | Hiểu hệ thống ráp nối ra sao |
 | 5 | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, **worked example từng bước**, Big-O, trade-off | Hiểu sâu 2 bộ não (Relocation/Putaway) |
-| 6 | [Sơ đồ thiết kế](./diagrams.md) | 12 sơ đồ Mermaid: class/ERD/component/use case/activity/sequence/state/flowchart | Nhìn trực quan mọi thứ ở trên |
+| 6 | [Sơ đồ thiết kế](./diagrams.md) | 18 sơ đồ Mermaid bao quát mọi nghiệp vụ: class/ERD (V1–V6) · component · use case · state (lô/đơn/transfer) · activity · sequence (putaway/CRP/picking/transfer/scan/realtime) · flowchart CRP+SLAP | Nhìn trực quan mọi thứ ở trên |
 
 ### B. Tra cứu khi cần (không cần đọc tuần tự)
 
