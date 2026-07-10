@@ -119,6 +119,28 @@ class InventoryApiTest {
 	}
 
 	@Test
+	void invalidEnumInBodyReturns400WithMessage() throws Exception {
+		// Body-side twin of the param cases above: deserialization failures
+		// (here an invalid enum constant) must carry {message} too.
+		String bad = """
+				{"code":"SKU-ENUM","name":"x","w":1,"d":1,"h":1,"weight":1,"handling":"LIFO"}""";
+		mvc.perform(post("/api/skus").contentType(MediaType.APPLICATION_JSON).content(bad))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(
+						org.hamcrest.Matchers.containsString("handling")))
+				.andExpect(jsonPath("$.message").value(
+						org.hamcrest.Matchers.containsString("FEFO")));
+	}
+
+	@Test
+	void malformedJsonBodyReturns400WithMessage() throws Exception {
+		mvc.perform(post("/api/skus").contentType(MediaType.APPLICATION_JSON).content("{not json"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(
+						org.hamcrest.Matchers.not(org.hamcrest.Matchers.emptyOrNullString())));
+	}
+
+	@Test
 	void createSkuWithBlankCodeReturns400() throws Exception {
 		String bad = """
 				{"code":"","name":"x","w":1,"d":1,"h":1,"weight":1,"handling":"FIFO"}""";

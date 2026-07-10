@@ -2,6 +2,13 @@
 
 > Nhật ký vấn đề gặp phải + nguyên nhân + cách giải, viết cho chính mình (theo [03-documentation.md](./03-documentation.md) §5). Mới nhất ở trên.
 
+## 2026-07-10 — Bẫy hai Jackson trên classpath khi thêm handler cho body 400
+
+- **Vấn đề:** gửi request body có enum sai (`"accessFace":"FRONT"` vào `POST /api/warehouses/{id}/generate`) → 400 nhưng body **không có `message`** (frontend hiển thị field này), dù #31 đã fix đúng vấn đề đó cho query param. Lỗi JSON hỏng cũng vậy.
+- **Nguyên nhân:** lỗi parse body ném `HttpMessageNotReadableException` — chưa có handler trong `ApiExceptionHandler` (khác đường với hai exception của query param mà #31 đã bắt). Rủi ro tinh vi khi viết handler: classpath có **cả hai** Jackson — **Jackson 3** (`tools.jackson` 3.1.4, mặc định của web layer Spring Boot 4) và **Jackson 2** (`com.fasterxml` 2.21.4, springdoc kéo theo). Hai bên có class trùng tên `InvalidFormatException` khác package; import nhầm bản Jackson 2 thì compile vẫn xanh, chạy không lỗi, nhưng `instanceof` **không bao giờ khớp** — handler "có mà như không", một bug im lặng.
+- **Đã sửa:** thêm handler `HttpMessageNotReadableException`: duyệt cause chain tìm `tools.jackson.databind.exc.InvalidFormatException` → message nêu field (từ `getPath()`), giá trị sai (`getValue()`), và danh sách hằng hợp lệ nếu target là enum (`getTargetType().getEnumConstants()`); không phải lỗi field cụ thể → message chung. Trước khi viết đã xác minh API thật của Jackson 3 bằng `javap` trên jar trong `~/.m2` (đỡ đoán mò tên method giữa hai major version).
+- **Học được:** nâng cấp major của framework có thể **đổi cả package của dependency lõi** (Boot 4: Jackson `com.fasterxml` → `tools.jackson`) mà vẫn giữ bản cũ trên classpath vì lib khác cần — khi hai class trùng tên khác package cùng tồn tại, `instanceof`/`catch` nhầm package là loại bug không có triệu chứng biên dịch. `javap -cp <jar>` là cách nhanh nhất kiểm tra API thật của một dependency. Test cho case lỗi (không chỉ happy path) là thứ bắt được handler "có mà như không": test enum sai phải assert *nội dung* message, không chỉ status 400.
+
 ## 2026-07-06 — Trang chủ qua Docker Compose luôn báo "Backend chưa sẵn sàng" dù backend healthy
 
 - **Vấn đề:** chạy trọn bộ bằng `docker compose up`, backend log `Started ... in 9.257 seconds`, `curl localhost:8080/api/warehouses` từ máy thật trả 200, WebSocket/STOMP từ trình duyệt vẫn kết nối được — nhưng trang chủ (`localhost:3000`) luôn render "Backend chưa sẵn sàng". Nghịch lý: API "chết" mà realtime "sống", cùng trỏ `localhost:8080`.
