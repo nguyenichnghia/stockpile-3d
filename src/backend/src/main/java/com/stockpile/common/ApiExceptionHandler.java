@@ -1,16 +1,22 @@
 package com.stockpile.common;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.InvalidFormatException;
 
 /** Maps domain/validation errors to consistent HTTP responses. */
 @RestControllerAdvice
@@ -44,6 +50,39 @@ public class ApiExceptionHandler {
 			MethodArgumentTypeMismatchException ex) {
 		return build(HttpStatus.BAD_REQUEST,
 				"Parameter '" + ex.getName() + "' has an invalid value: '" + ex.getValue() + "'");
+	}
+
+	/**
+	 * Unreadable request body — malformed JSON, or a field that cannot be
+	 * deserialized (e.g. an invalid enum constant like {@code accessFace:
+	 * "FRONT"}). Body-side counterpart of the query-param handlers above; same
+	 * rationale: Spring's default 400 body carries no {@code message}.
+	 */
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<Map<String, Object>> handleUnreadableBody(
+			HttpMessageNotReadableException ex) {
+		for (Throwable cause = ex.getCause(); cause != null; cause = cause.getCause()) {
+			if (cause instanceof InvalidFormatException ife) {
+				return build(HttpStatus.BAD_REQUEST, invalidFieldMessage(ife));
+			}
+		}
+		return build(HttpStatus.BAD_REQUEST, "Request body is missing or malformed");
+	}
+
+	/** e.g. "Field 'accessFace' has an invalid value: 'FRONT' (expected one of: NORTH, …)". */
+	private static String invalidFieldMessage(InvalidFormatException ife) {
+		String field = ife.getPath().stream()
+				.map(JacksonException.Reference::getPropertyName)
+				.filter(Objects::nonNull)
+				.collect(Collectors.joining("."));
+		String message = "Field '" + (field.isEmpty() ? "<body>" : field)
+				+ "' has an invalid value: '" + ife.getValue() + "'";
+		Class<?> target = ife.getTargetType();
+		if (target != null && target.isEnum()) {
+			message += " (expected one of: " + Arrays.stream(target.getEnumConstants())
+					.map(Object::toString).collect(Collectors.joining(", ")) + ")";
+		}
+		return message;
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
