@@ -16,7 +16,7 @@
 | 2 | [Nghiệp vụ kho](./business.md) | Quy trình WMS (5 loại movement), vai trò người dùng, vòng đời lô, FIFO/FEFO, ground-truth | Hiểu *nghiệp vụ* hệ thống hỗ trợ |
 | 3 | [Data model](./data-model.md) | 5 bảng: từng cột/ràng buộc/index + **lý do thiết kế** + vòng đời dữ liệu | Hiểu dữ liệu được lưu thế nào |
 | 4 | [Kiến trúc hệ thống](./architecture.md) | 3 tầng, luồng dữ liệu (write/read/decision), invariant, NFR, **API reference**, deploy | Hiểu hệ thống ráp nối ra sao |
-| 5 | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, NP-hard, pseudocode, **worked example từng bước**, Big-O, trade-off | Hiểu sâu 2 bộ não (Relocation/Putaway) |
+| 5 | [Đặc tả thuật toán](./algorithm-spec.md) | CRP + SLAP: bài toán, độ khó NP-hard, mã giả, **ví dụ chạy tay từng bước**, độ phức tạp Big-O, đánh đổi | Hiểu sâu 2 bộ não (Relocation/Putaway) |
 | 6 | [Sơ đồ thiết kế](./diagrams.md) | 18 sơ đồ Mermaid bao quát mọi nghiệp vụ: class/ERD (V1–V6) · component · use case · state (lô/đơn/transfer) · activity · sequence (putaway/CRP/picking/transfer/scan/realtime) · flowchart CRP+SLAP | Nhìn trực quan mọi thứ ở trên |
 
 ### B. Tra cứu khi cần (không cần đọc tuần tự)
@@ -26,7 +26,7 @@
 | 7 | [Từ điển thuật ngữ](./glossary.md) | Giải thích ngắn tiếng Việt các thuật ngữ kỹ thuật, thư viện, pattern | Bất cứ lúc nào gặp từ chưa rõ |
 | 8 | [Lộ trình học](./learning-path.md) | Bài luyện thuật toán (LeetCode) + tài liệu map vào dự án | Khi muốn học thêm để hiểu sâu |
 | 9 | [Đề xuất thiết kế hệ thống](./system-design-proposal.md) | Công nghệ + mẫu thiết kế giúp mạnh/scale/tin cậy hơn (CQRS, Redis, optimistic lock, Kafka, Hexagonal...) — kèm ưu tiên Now/Next/Later | Khi nghĩ về nâng cấp / scale / production |
-| 10 | [Thiết lập kho](./warehouse-setup.md) | Các cách tạo dữ liệu vị trí (generator theo lưới / import CSV-Excel / editor 3D) — kèm trade-off + ưu tiên Now/Next/Later | Khi cần dựng dữ liệu kho để chạy/thử |
+| 10 | [Thiết lập kho](./warehouse-setup.md) | Các cách tạo dữ liệu vị trí (bộ sinh theo lưới / nhập CSV-Excel / trình soạn 3D) — kèm đánh đổi + ưu tiên Now/Next/Later | Khi cần dựng dữ liệu kho để chạy/thử |
 | 11 | [Dev Log](./dev-log.md) | Nhật ký vấn đề + nguyên nhân + cách giải | Xem các bug đã gặp & cách xử lý |
 
 ### C. Quy trình phát triển (đọc khi bắt tay code/đóng góp)

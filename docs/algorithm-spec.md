@@ -75,7 +75,7 @@ function plan(targetLotId):
 
 **Vị trí tạm (temp slot)** — vị trí trống (không có placement) ưu tiên **cùng lane**, sau đó toàn kho; phải **không tạo blocking mới** (kiểm bằng chính `BlockingGraph`). Hết chỗ → `IllegalStateException`.
 
-## 4b. Worked example — chạy tay từng bước (CRP)
+## 4b. Ví dụ chạy tay từng bước (CRP)
 
 Ví dụ cụ thể để thấy thuật toán "suy nghĩ" thế nào. Một lane có **3 lô xếp chồng** cùng cột `(x,y) = (0,0)`, mỗi lô cao 2 (z-range bên dưới), `access_face = TOP`. Có 2 vị trí trống `E1`, `E2` ở cột khác (không chồng ai).
 
@@ -128,9 +128,9 @@ Với `n` = số lô trong lane (theo NFR ≤ ~100):
 
 **Vì sao xấu nhất là `O(n²)`:** trường hợp tệ nhất mỗi vòng dời được đúng 1 lô (chuỗi chồng thẳng đứng `n` lô) → `n` vòng; mỗi vòng quét `n` lô để tìm blocker + `n` vị trí để tìm temp → `O(n)` mỗi vòng → `n × n = n²`. Với `n ≤ 100`: ~10⁴ phép tính, dưới mili-giây.
 
-## 6. Trade-off + hướng cải thiện
+## 6. Đánh đổi + hướng cải thiện
 
-- **Trade-off:** greedy **không** đảm bảo số bước tối thiểu tuyệt đối. Đổi lại: nhanh, real-time, và **giải thích được** cho người vận hành (so với branch-and-bound/beam search khó diễn giải). Đủ tốt cho phần lớn ca thực tế.
+- **Đánh đổi:** greedy **không** đảm bảo số bước tối thiểu tuyệt đối. Đổi lại: nhanh, thời gian thực, và **giải thích được** cho người vận hành (so với branch-and-bound/beam search khó diễn giải). Đủ tốt cho phần lớn ca thực tế.
 - **Cải thiện sau:** nếu mở rộng kho rất lớn hoặc cần tối ưu hơn — đánh giá beam search (tìm kiếm chùm) hoặc branch-and-bound (nhánh-cận), và tối ưu dựng đồ thị blocking xuống `O(n log n)` bằng index không gian theo lane.
 
 ### 6b. Greedy có thể "thua" tối ưu ở đâu? (ví dụ)
@@ -188,15 +188,15 @@ Chọn `c` có `score` **nhỏ nhất**. Trọng số `w1..w4` cấu hình qua `
 - **Lọc cứng (fit):** `lô.w ≤ bin.w && lô.d ≤ bin.d && lô.h ≤ bin.h`; không vừa thì loại khỏi ứng viên.
 
 ### 9.3. Độ phức tạp
-`O(F·k)` — `F` = số vị trí trống khả thi (sau lọc), mỗi đánh giá `O(k)` với `k` = số lô trong lane (cho blockingPenalty). Thực tế nhỏ. Tuyến tính → real-time.
+`O(F·k)` — `F` = số vị trí trống khả thi (sau lọc), mỗi đánh giá `O(k)` với `k` = số lô trong lane (cho blockingPenalty). Thực tế nhỏ. Tuyến tính → chạy thời gian thực.
 
-### 9.4. Trade-off
+### 9.4. Đánh đổi
 Greedy + tuyến tính: **giải thích được** (mỗi điểm là tổng các chi phí rõ ràng), nhanh, cấu hình được theo kho. Không tối ưu toàn cục (vd không xét tương tác giữa nhiều lô cất cùng lúc). Đủ cho v1; có thể nâng cấp gán theo lô hàng loạt sau.
 
 ### 9.5. Test case
 `PutawayServiceTest` (Testcontainers): (1) chọn bin gần dock + thấp nhất; (2) bỏ qua bin nhỏ hơn lô; (3) không bin nào vừa → `recommendedBinId = null`.
 
-### 9.6. Worked example — chấm điểm từng vị trí (SLAP)
+### 9.6. Ví dụ chấm điểm từng vị trí (SLAP)
 
 Cất một lô `1×1×1` **có expiry** (nhạy FEFO → `urgency = 2`). Có 3 vị trí trống `2×2×2` (đều vừa). Trọng số mặc định: `w1=1, w2=10, w3=2, w4=5`.
 

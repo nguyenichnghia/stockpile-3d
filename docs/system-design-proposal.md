@@ -1,6 +1,6 @@
 # Đề xuất thiết kế hệ thống — hướng tới production quy mô lớn
 
-> **Tài liệu đề xuất (forward-looking).** Phân tích hiện trạng rồi đề xuất công nghệ + mẫu thiết kế (design pattern) giúp Stockpile-3D mạnh mẽ, mở rộng và tin cậy hơn ở quy mô production lớn (nhiều kho, hàng chục nghìn vị trí, nhiều người dùng đồng thời).
+> **Tài liệu đề xuất (định hướng tương lai).** Phân tích hiện trạng rồi đề xuất công nghệ + mẫu thiết kế (design pattern) giúp Stockpile-3D mạnh mẽ, mở rộng và tin cậy hơn ở quy mô vận hành thật lớn (nhiều kho, hàng chục nghìn vị trí, nhiều người dùng đồng thời).
 >
 > **Tính chất:** đây là *đề xuất để tham khảo/thảo luận*, **không phải** quyết định đã chốt. Quyết định thật phải thành [ADR](./adr/) riêng. Tài liệu cũng trung thực về **trade-off** và đánh dấu **mức ưu tiên** (Now / Next / Later) để tránh over-engineering (làm quá mức cần thiết). Đọc cùng [architecture.md](./architecture.md) (hiện trạng) và [01-overview.md](./01-overview.md).
 
