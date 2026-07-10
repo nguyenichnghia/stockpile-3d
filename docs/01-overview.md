@@ -1,5 +1,5 @@
 # Stockpile-3D — Hệ thống Quản lý Kho 3D Thông minh
-### Tài liệu tổng quan & thiết kế (Overview & Design)
+### Tài liệu tổng quan & thiết kế
 
 ---
 
@@ -88,8 +88,8 @@ Stockpile-3D biểu diễn kho dưới dạng **mô hình không gian 3 chiều 
 |---|---|---|
 | `Warehouse` | Một site kho vật lý (ADR-0009) | `code` (UNIQUE), `name`; mỗi kho có hệ tọa độ riêng, dock ở gốc `(0,0,0)` |
 | `Location` (zone→aisle→rack→level→bin) | Khung không gian kho | `warehouse_id`, toạ độ `(x,y,z)` góc, kích thước `(w,d,h)`, `lane_id`, `access_face` (hướng lấy hàng); mã ô UNIQUE **trong một kho** |
-| `Sku` | Master sản phẩm | `dims`, `weight`, `handling` (FIFO/FEFO) |
-| `Lot` | Đơn vị vật lý đặt trong kho | `sku_id`, bounding box `(w,d,h)`, `weight`, `expiry`, `predicted_retrieval_at` |
+| `Sku` | Danh mục sản phẩm | `dims`, `weight`, `handling` (FIFO/FEFO) |
+| `Lot` | Đơn vị vật lý đặt trong kho | `sku_id`, khối bao `(w,d,h)`, `weight`, `expiry`, `predicted_retrieval_at` |
 | `Placement` | Lô đang chiếm vị trí nào | `lot_id`, `bin_id`, pose `(x,y,z)` — **projection từ ledger** |
 | `Movement` | Bút toán vật lý (append-only) | `lot_id`, `warehouse_id`, `type`, `from_bin`, `to_bin`, `ts`, `actor`, `scan_ref`; hai bin phải cùng kho (chưa có transfer, ADR-0009) |
 
@@ -134,7 +134,7 @@ score(c) = w₁·dist_to_dock(c)
 ```
 Chọn `c` có `score` nhỏ nhất. **Độ phức tạp:** `O(F)` với F là số vị trí trống khả thi sau khi lọc theo lane/kích thước (thực tế F nhỏ nhờ tiền lọc), mỗi đánh giá `O(k)` với k lô lân cận → tổng `O(F·k)`.
 
-**Trade-off:** greedy không tối ưu toàn cục, nhưng giải thích được cho người dùng và chạy real-time. Trọng số `wᵢ` để cấu hình theo kho.
+**Đánh đổi:** greedy (tham lam) không tối ưu toàn cục, nhưng giải thích được cho người dùng và chạy thời gian thực. Trọng số `wᵢ` để cấu hình theo kho.
 
 ### 8.3. Relocation Engine — bài toán CRP (lõi giá trị)
 **Bài toán:** Container/Block Relocation Problem — cho lô mục tiêu cần rút, tìm chuỗi di chuyển **tối thiểu** để giải phóng nó, sao cho mỗi lô bị dời được đặt vào vị trí tạm hợp lệ không gây kẹt mới. Đây là kết quả **NP-hard đã biết** trong literature CRP (xem Caserta, Schwarze, Voß — survey container rehandling; và chứng minh độ phức tạp của Block Relocation Problem).
@@ -155,7 +155,7 @@ function relocate(target, lane):
 ```
 **Độ phức tạp:** dựng đồ thị blocking `O(n log n)` sau khi index theo lane (bản ngây thơ `O(n²)`); vòng giải tối đa `O(n)` bước, mỗi bước tìm dest `O(n)` → tổng `O(n²)` trong trường hợp xấu, với n = số lô trong lane (≤ ~100 theo NFR). Output được biến thành animation 3D — người dùng không phải tự suy luận.
 
-**Trade-off đã biết:** greedy **không** đảm bảo số bước tối thiểu tuyệt đối (branch-and-bound / beam search tốt hơn nhưng chậm và khó diễn giải). Đủ tốt cho phần lớn ca thực tế; sẽ đánh giá lại nếu mở rộng kho rất lớn. *(Quyết định này ghi đầy đủ trong ADR-0001, file 03.)*
+**Đánh đổi đã biết:** greedy (tham lam) **không** đảm bảo số bước tối thiểu tuyệt đối (branch-and-bound / beam search tốt hơn nhưng chậm và khó diễn giải). Đủ tốt cho phần lớn ca thực tế; sẽ đánh giá lại nếu mở rộng kho rất lớn. *(Quyết định này ghi đầy đủ trong ADR-0001, file 03.)*
 
 ### 8.4. Picking & Order Management
 Zone/wave picking để tránh nhân viên chồng lối đi; FIFO/FEFO cho hàng có hạn dùng.

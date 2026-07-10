@@ -1,6 +1,6 @@
-# Thiết lập kho — các cách tạo dữ liệu vị trí (warehouse setup)
+# Thiết lập kho — các cách tạo dữ liệu vị trí
 
-> **Tài liệu đề xuất (forward-looking).** Bàn về khâu **thiết lập kho** — cách tạo ra dữ liệu `location` (các bin/kệ với tọa độ x/y/z, kích thước, lane, access face) trước khi kho có thể chứa hàng và chạy các engine (CRP/SLAP). Đây là **tiền đề** của mọi tính năng khác: không có vị trí thì không có gì để đặt hàng, để tra cứu, để tô màu.
+> **Tài liệu đề xuất (định hướng tương lai).** Bàn về khâu **thiết lập kho** — cách tạo ra dữ liệu `location` (các ô/kệ với tọa độ x/y/z, kích thước, lane, hướng lấy hàng) trước khi kho có thể chứa hàng và chạy các engine (CRP/SLAP). Đây là **tiền đề** của mọi tính năng khác: không có vị trí thì không có gì để đặt hàng, để tra cứu, để tô màu.
 >
 > **Tính chất:** *đề xuất để tham khảo/thảo luận*, **không phải** quyết định đã chốt. Quyết định thật (vd chọn định dạng import, làm editor 3D) nên thành [ADR](./adr/) riêng. Tài liệu ghi trung thực **trade-off** (đánh đổi) và **mức ưu tiên** (Now / Next / Later). Đọc cùng [data-model.md](./data-model.md) (bảng `location`) và [architecture.md](./architecture.md).
 

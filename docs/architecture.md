@@ -61,7 +61,7 @@ flowchart TB
 
 ## 2. Luồng dữ liệu chính
 
-### 2.1. Ghi một thay đổi vật lý (write path)
+### 2.1. Ghi một thay đổi vật lý (luồng ghi)
 ```mermaid
 sequenceDiagram
     actor U as Operator
@@ -79,11 +79,11 @@ sequenceDiagram
     API-->>U: 201 Created
 ```
 
-### 2.2. Đọc trạng thái để render (read path)
+### 2.2. Đọc trạng thái để render (luồng đọc)
 Frontend gọi `GET /api/locations` (khung kệ) + `GET /api/placements` (lô đang đặt) → render bằng `InstancedMesh`. Đọc thẳng từ `placement` (projection) — nhanh, không phải replay ledger mỗi lần.
 
-### 2.3. Đề xuất (decision path)
-`GET /api/relocation-plan` (CRP) và `GET /api/putaway-suggestion` (SLAP) **chỉ đọc** projection + master, trả đề xuất. **Không** ghi gì — đúng invariant "engine đề xuất, người xác nhận".
+### 2.3. Đề xuất (luồng ra quyết định)
+`GET /api/relocation-plan` (CRP) và `GET /api/putaway-suggestion` (SLAP) **chỉ đọc** projection + dữ liệu gốc, trả đề xuất. **Không** ghi gì — đúng invariant "engine đề xuất, người xác nhận".
 
 ## 3. Invariant kiến trúc (không vi phạm nếu chưa có ADR mới)
 
@@ -106,7 +106,7 @@ Frontend gọi `GET /api/locations` (khung kệ) + `GET /api/placements` (lô đ
 
 Base URL: `http://localhost:8080`. Tài liệu sống: `/swagger-ui.html` (springdoc). Tất cả body JSON.
 
-### Inventory — master data (CRUD đầy đủ)
+### Inventory — dữ liệu gốc (CRUD đầy đủ)
 | Method | Path | Mô tả | Lỗi |
 |---|---|---|---|
 | GET | `/api/skus` · `/api/skus/{id}` | liệt kê / xem SKU | 404 |

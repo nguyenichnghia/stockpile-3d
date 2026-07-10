@@ -456,7 +456,7 @@ flowchart TD
     E -- PUTAWAY/INBOUND(có toBin) --> F["Upsert placement tại toBin"]
     E -- RELOCATE --> G["Đổi bin của placement"]
     E -- PICK/OUTBOUND --> H["Xóa placement của lot"]
-    E -- INBOUND staging (no bin) --> I0["Không đổi placement"]
+    E -- "INBOUND vào staging (không có ô)" --> I0["Không đổi placement"]
     F --> P["Publish MovementRecordedEvent"]
     G --> P
     H --> P
