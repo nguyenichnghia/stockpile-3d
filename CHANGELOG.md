@@ -8,6 +8,7 @@ version theo [SemVer](https://semver.org/lang/vi/).
 ## [Unreleased]
 
 ### Added
+- **SLAP gợi ý ô đích khi nhận transfer** — `GET /api/transfers/{id}/suggest-bin`: chấm điểm các ô trống của kho đích cho lô đang in-transit bằng đúng Putaway Engine sẵn có (lô in-transit chỉ là lô chưa có placement nên `PutawayService.suggest` dùng được nguyên vẹn — không thêm engine mới). Kho đích suy từ transfer (đúng pattern các read khác), guard `IN_TRANSIT` (transfer đã nhận/hủy → 409-style `IllegalStateException`), thuần read-only — bước Nhận vẫn là hành động xác nhận riêng, giữ bất biến "engine đề xuất, người xác nhận". Đóng giới hạn "ô đích chọn thủ công" ghi lại trong ADR-0010. Frontend `/reports`: dropdown ô đích được chọn sẵn ô gợi ý (đánh dấu ★, nhãn "ô do SLAP gợi ý"); user đổi ô khác thoải mái, một gợi ý lỗi không làm hỏng danh sách (`Promise.allSettled`). Test: `TransferServiceTest` thêm 3 case (gợi ý bỏ qua ô đã có hàng, guard trạng thái, 404).
 - **CI bằng GitHub Actions** (`.github/workflows/ci.yml`): mọi PR vào `main` (và push lên `main`) chạy hai job song song — backend `mvnw test` (đủ 110 test Testcontainers, runner `ubuntu-latest` có sẵn Docker) và frontend `npm ci` + lint + `next build` (build kiêm type-check vì frontend chưa có unit test). Tự động hóa bất biến "main luôn build pass" của [02 §2](docs/02-git-workflow.md) thay vì tin vào kỷ luật chạy test tay trước khi merge. Kèm fix nền: `mvnw` trước giờ được commit thiếu bit thực thi (mode `100644`) — checkout trên Linux sẽ "permission denied", trên Windows không bao giờ lộ ra.
 
 ### Fixed

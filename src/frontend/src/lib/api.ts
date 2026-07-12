@@ -341,3 +341,20 @@ export const fetchIncomingTransfers = (toWarehouseId: number) =>
 /** Receives an in-transit transfer into a bin of its destination warehouse. */
 export const receiveTransfer = (transferId: number, toBinId: number) =>
   postJson<Transfer>(`/api/transfers/${transferId}/receive`, { toBinId });
+
+/**
+ * SLAP result: the recommended bin plus ranked alternatives (lower score is
+ * better). A proposal only — nothing moves until the user confirms.
+ */
+export type PutawaySuggestion = {
+  lotId: number;
+  recommendedBinId: number | null;
+  candidates: { binId: number; score: number }[];
+};
+
+/**
+ * Asks the putaway engine where to receive an in-transit transfer. The
+ * destination warehouse is derived from the transfer on the backend.
+ */
+export const fetchTransferBinSuggestion = (transferId: number) =>
+  getJson<PutawaySuggestion>(`/api/transfers/${transferId}/suggest-bin`);
