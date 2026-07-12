@@ -35,11 +35,16 @@ function HeatmapBins({
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [matrices, colors]);
 
+  // An InstancedMesh must have >= 1 instance, and an instance that never got a
+  // setMatrixAt keeps the identity matrix — a ghost 1×1×1 box at the origin.
+  // So render nothing at all when there is nothing to draw.
+  if (matrices.length === 0) return null;
+
   return (
     <instancedMesh
       key={matrices.length}
       ref={ref}
-      args={[undefined, undefined, Math.max(matrices.length, 1)]}
+      args={[undefined, undefined, matrices.length]}
       frustumCulled
     >
       <boxGeometry args={[1, 1, 1]} />
@@ -88,12 +93,16 @@ function Instances({
     mesh.instanceMatrix.needsUpdate = true;
   }, [matrices]);
 
+  // Same ghost-instance guard as HeatmapBins: an empty list must draw nothing,
+  // not one identity-matrix box at the origin.
+  if (matrices.length === 0) return null;
+
   // key forces a fresh mesh when the instance count changes.
   return (
     <instancedMesh
       key={matrices.length}
       ref={ref}
-      args={[undefined, undefined, Math.max(matrices.length, 1)]}
+      args={[undefined, undefined, matrices.length]}
       frustumCulled
     >
       <boxGeometry args={[1, 1, 1]} />
@@ -353,7 +362,9 @@ export default function Warehouse3D({
         </>
       )}
 
-      <OrbitControls makeDefault />
+      {/* Clamp the orbit above the floor: from underneath, grounded lots appear
+          to float over the grid — it reads as a rendering bug. */}
+      <OrbitControls makeDefault maxPolarAngle={Math.PI / 2 - 0.05} />
       <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
         <GizmoViewport />
       </GizmoHelper>
