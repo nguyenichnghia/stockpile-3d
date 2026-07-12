@@ -7,6 +7,9 @@ version theo [SemVer](https://semver.org/lang/vi/).
 
 ## [Unreleased]
 
+### Added
+- **CI bằng GitHub Actions** (`.github/workflows/ci.yml`): mọi PR vào `main` (và push lên `main`) chạy hai job song song — backend `mvnw test` (đủ 110 test Testcontainers, runner `ubuntu-latest` có sẵn Docker) và frontend `npm ci` + lint + `next build` (build kiêm type-check vì frontend chưa có unit test). Tự động hóa bất biến "main luôn build pass" của [02 §2](docs/02-git-workflow.md) thay vì tin vào kỷ luật chạy test tay trước khi merge. Kèm fix nền: `mvnw` trước giờ được commit thiếu bit thực thi (mode `100644`) — checkout trên Linux sẽ "permission denied", trên Windows không bao giờ lộ ra.
+
 ### Fixed
 - Request body không đọc được (JSON hỏng, hoặc field không deserialize được — ví dụ enum sai `"accessFace":"FRONT"` khi generate) giờ trả 400 với `message` nêu tên field, giá trị sai và danh sách giá trị hợp lệ nếu là enum — nửa còn lại của fix #31 (query param): `HttpMessageNotReadableException` trước đây chưa có handler nên rơi về body mặc định của Spring không có `message`, thứ frontend hiển thị. Lưu ý kỹ thuật: web layer của Spring Boot 4 dùng **Jackson 3** (`tools.jackson`) — handler phải bắt `InvalidFormatException` của Jackson 3; bản `com.fasterxml` (Jackson 2) vẫn nằm trên classpath (springdoc kéo theo) nhưng import nhầm nó thì `instanceof` không bao giờ khớp.
 - Trang chủ chạy qua Docker Compose luôn báo "Backend chưa sẵn sàng": fetch của server component chạy *bên trong* container frontend, nơi `localhost:8080` trỏ về chính nó chứ không phải backend. `api.ts` giờ phân biệt nơi chạy — phía server ưu tiên `API_URL_INTERNAL` (env runtime, compose đặt `http://backend:8080`), phía trình duyệt giữ `NEXT_PUBLIC_API_URL`. Chạy dev trên máy thật không đổi hành vi (fallback như cũ).

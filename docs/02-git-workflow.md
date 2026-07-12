@@ -139,4 +139,4 @@ Giúp người xem repo thấy mốc tiến trình rõ ràng, không chỉ là m
 
 ---
 
-*Tập trung thực hành tối thiểu cho dự án solo — không áp dụng quy trình team lớn (CI/CD phức tạp, nhiều môi trường) vì chưa cần ở quy mô này.*
+*Tập trung thực hành tối thiểu cho dự án solo — không áp dụng quy trình team lớn (CD nhiều môi trường, release train) vì chưa cần ở quy mô này. Riêng CI thì có, ở mức tối giản: GitHub Actions (`.github/workflows/ci.yml`) chạy backend test + frontend lint/build cho mọi PR vào `main` — tự động hóa đúng quy tắc "main luôn build pass" ở §2 thay vì dựa vào kỷ luật chạy test tay.*
