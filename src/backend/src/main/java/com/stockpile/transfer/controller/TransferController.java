@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.stockpile.putaway.dto.PutawaySuggestion;
 import com.stockpile.transfer.dto.OpenTransferRequest;
 import com.stockpile.transfer.dto.ReceiveTransferRequest;
 import com.stockpile.transfer.dto.TransferDto;
@@ -42,6 +43,16 @@ public class TransferController {
 	public ResponseEntity<TransferDto> open(@Valid @RequestBody OpenTransferRequest req) {
 		TransferDto dto = transferService.open(req.lotId(), req.toWarehouseId());
 		return ResponseEntity.created(URI.create("/api/transfers/" + dto.id())).body(dto);
+	}
+
+	/**
+	 * SLAP suggestion for the receiving bin of an in-transit transfer. The
+	 * destination warehouse is derived from the transfer itself. Read-only —
+	 * receiving stays a separate, confirmed action.
+	 */
+	@GetMapping("/{id}/suggest-bin")
+	public PutawaySuggestion suggestBin(@PathVariable Long id) {
+		return transferService.suggestBin(id);
 	}
 
 	@PostMapping("/{id}/receive")

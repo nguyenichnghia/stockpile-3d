@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   binCode,
   fetchIncomingTransfers,
+  fetchTransferBinSuggestion,
   fetchLocations,
   fetchMovementsDaily,
   fetchReportSummary,
@@ -219,12 +220,37 @@ function IncomingTransfersSection({ warehouseId }: { warehouseId: number }) {
   const [transfers, setTransfers] = useState<Transfer[] | null>(null);
   const [bins, setBins] = useState<Location[]>([]);
   const [target, setTarget] = useState<Record<number, string>>({});
+  const [suggested, setSuggested] = useState<Record<number, number>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function reload() {
     fetchIncomingTransfers(warehouseId)
-      .then(setTransfers)
+      .then(async (list) => {
+        setTransfers(list);
+        // Ask SLAP where each arriving lot should go and pre-select the answer.
+        // A proposal only: the dropdown stays editable and nothing moves until
+        // Nhận. allSettled so one failed suggestion doesn't break the list.
+        const results = await Promise.allSettled(
+          list.map(async (t) => {
+            const s = await fetchTransferBinSuggestion(t.id);
+            return [t.id, s.recommendedBinId] as const;
+          }),
+        );
+        const sug: Record<number, number> = {};
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value[1] != null) sug[r.value[0]] = r.value[1];
+        }
+        setSuggested(sug);
+        // Pre-fill only where the user hasn't picked a bin themselves.
+        setTarget((m) => {
+          const next = { ...m };
+          for (const [id, binId] of Object.entries(sug)) {
+            if (!next[Number(id)]) next[Number(id)] = String(binId);
+          }
+          return next;
+        });
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải danh sách chuyển kho"));
   }
 
@@ -270,8 +296,9 @@ function IncomingTransfersSection({ warehouseId }: { warehouseId: number }) {
     >
       <h2 style={{ margin: "0 0 4px", fontSize: 14 }}>Hàng đang chuyển đến kho này</h2>
       <p style={{ margin: "0 0 12px", color: INK_MUTED, fontSize: 12 }}>
-        Lô đã rời kho nguồn và đang trên đường (ADR-0010). Chọn ô đích rồi bấm
-        Nhận để ghi INBOUND — lô sẽ xuất hiện trong kho 3D.
+        Lô đã rời kho nguồn và đang trên đường (ADR-0010). Ô đích được SLAP gợi
+        ý sẵn (★) — giữ nguyên hoặc chọn ô khác, rồi bấm Nhận để ghi INBOUND —
+        lô sẽ xuất hiện trong kho 3D.
       </p>
 
       {error && <p style={{ color: SERIOUS, fontSize: 13 }}>{error}</p>}
@@ -308,9 +335,13 @@ function IncomingTransfersSection({ warehouseId }: { warehouseId: number }) {
               {bins.map((b) => (
                 <option key={b.id} value={b.id}>
                   {binCode(b)}
+                  {suggested[t.id] === b.id ? " ★ gợi ý" : ""}
                 </option>
               ))}
             </select>
+            {suggested[t.id] != null && Number(target[t.id]) === suggested[t.id] && (
+              <span style={{ color: INK_MUTED, fontSize: 12 }}>ô do SLAP gợi ý</span>
+            )}
             <button
               type="button"
               onClick={() => receive(t)}

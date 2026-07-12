@@ -18,6 +18,8 @@ import com.stockpile.inventory.repository.LotRepository;
 import com.stockpile.inventory.repository.PlacementRepository;
 import com.stockpile.inventory.repository.WarehouseRepository;
 import com.stockpile.inventory.service.MovementService;
+import com.stockpile.putaway.dto.PutawaySuggestion;
+import com.stockpile.putaway.service.PutawayService;
 import com.stockpile.transfer.domain.Transfer;
 import com.stockpile.transfer.domain.TransferStatus;
 import com.stockpile.transfer.dto.TransferDto;
@@ -52,6 +54,7 @@ public class TransferService {
 	private final WarehouseRepository warehouseRepository;
 	private final PlacementRepository placementRepository;
 	private final MovementService movementService;
+	private final PutawayService putawayService;
 
 	/**
 	 * Opens a transfer of {@code lotId} to {@code toWarehouseId}: records an
@@ -133,6 +136,23 @@ public class TransferService {
 		transfer.setStatus(TransferStatus.COMPLETED);
 		transfer.setCompletedAt(Instant.now());
 		return TransferDto.from(transfer);
+	}
+
+	/**
+	 * SLAP suggestion for where to receive an in-transit transfer: scores the
+	 * destination warehouse's empty bins for the transfer's lot (the same engine
+	 * as ordinary putaway — an in-transit lot is just a lot without a placement).
+	 * Read-only proposal; the caller still confirms via {@link #receive}.
+	 */
+	@Transactional(readOnly = true)
+	public PutawaySuggestion suggestBin(Long transferId) {
+		Transfer transfer = transferRepository.findById(transferId)
+				.orElseThrow(() -> new NotFoundException("Transfer " + transferId + " not found"));
+		if (transfer.getStatus() != TransferStatus.IN_TRANSIT) {
+			throw new IllegalStateException(
+					"Transfer " + transferId + " is not in transit (status " + transfer.getStatus() + ")");
+		}
+		return putawayService.suggest(transfer.getLot().getId(), transfer.getToWarehouse().getId());
 	}
 
 	/** In-transit transfers arriving at the given warehouse (the "đang chuyển" list). */

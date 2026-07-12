@@ -158,6 +158,47 @@ class TransferServiceTest {
 	}
 
 	@Test
+	void suggestBinRecommendsAnEmptyBinOfTheDestination() {
+		Warehouse a = warehouse("WH-A");
+		Warehouse b = warehouse("WH-B");
+		Sku sku = sku("SHIRT");
+		Lot lot = lot(sku);
+		putaway(lot, bin(a, "BIN-A"));
+		Location occupied = bin(b, "BIN-B1");
+		Location free = bin(b, "BIN-B2");
+		putaway(lot(sku), occupied); // B's other bin is taken — not a candidate
+
+		TransferDto t = transferService.open(lot.getId(), b.getId());
+		var suggestion = transferService.suggestBin(t.id());
+
+		assertThat(suggestion.lotId()).isEqualTo(lot.getId());
+		assertThat(suggestion.recommendedBinId()).isEqualTo(free.getId());
+		assertThat(suggestion.candidates()).extracting(c -> c.binId()).containsExactly(free.getId());
+	}
+
+	@Test
+	void cannotSuggestBinForACompletedTransfer() {
+		Warehouse a = warehouse("WH-A");
+		Warehouse b = warehouse("WH-B");
+		Sku sku = sku("SHIRT");
+		Lot lot = lot(sku);
+		putaway(lot, bin(a, "BIN-A"));
+		Location binB = bin(b, "BIN-B");
+
+		TransferDto t = transferService.open(lot.getId(), b.getId());
+		transferService.receive(t.id(), binB.getId());
+		assertThatThrownBy(() -> transferService.suggestBin(t.id()))
+				.isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("not in transit");
+	}
+
+	@Test
+	void suggestBinForUnknownTransferIs404() {
+		assertThatThrownBy(() -> transferService.suggestBin(999_999L))
+				.isInstanceOf(NotFoundException.class);
+	}
+
+	@Test
 	void openingUnknownLotIs404() {
 		Warehouse b = warehouse("WH-B");
 		assertThatThrownBy(() -> transferService.open(999_999L, b.getId()))
